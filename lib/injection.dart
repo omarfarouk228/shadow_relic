@@ -17,6 +17,7 @@ ShadowRelicGame createGame({
   return ShadowRelicGame(
     loadLevel: LoadLevel(levelRepository),
     loadProgress: LoadProgress(progress),
+    hasSavedProgress: HasSavedProgress(progress),
     saveProgress: SaveProgress(progress),
     clearProgress: ClearProgress(progress),
   );

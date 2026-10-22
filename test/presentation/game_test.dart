@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shadow_relic/core/constants.dart';
 import 'package:shadow_relic/domain/entities/ability.dart';
 import 'package:shadow_relic/domain/entities/game_progress.dart';
+import 'package:shadow_relic/domain/entities/spawn.dart';
 import 'package:shadow_relic/domain/entities/tile.dart';
 import 'package:shadow_relic/domain/repositories/progress_repository.dart';
 import 'package:shadow_relic/injection.dart';
@@ -14,16 +15,12 @@ import 'package:shadow_relic/presentation/overlays/overlay_ids.dart';
 
 class InMemoryProgressRepository implements ProgressRepository {
   GameProgress? stored;
-  int saves = 0;
 
   @override
   Future<GameProgress?> load() async => stored;
 
   @override
-  Future<void> save(GameProgress progress) async {
-    stored = progress;
-    saves++;
-  }
+  Future<void> save(GameProgress progress) async => stored = progress;
 
   @override
   Future<void> clear() async => stored = null;
@@ -37,34 +34,47 @@ Future<void> step(ShadowRelicGame game, double seconds) async {
   }
 }
 
-Future<ShadowRelicGame> started(
-  InMemoryProgressRepository repo, {
-  bool continueSave = false,
-}) async {
-  final game = await initializeGame(() => createGame(progressRepository: repo));
+Future<ShadowRelicGame> loaded(InMemoryProgressRepository repo) async {
+  final game =
+      await initializeGame(() => createGame(progressRepository: repo));
   // sans GameWidget, les overlays doivent être déclarés à la main
   for (final id in [Overlays.menu, Overlays.pause, Overlays.victory]) {
     game.overlays.addEntry(id, (_, __) => const SizedBox());
   }
+  return game;
+}
+
+Future<ShadowRelicGame> started(
+  InMemoryProgressRepository repo, {
+  bool continueSave = false,
+}) async {
+  final game = await loaded(repo);
   await game.startGame(continueSave: continueSave);
   await game.ready();
   return game;
 }
 
+/// Place le joueur debout dans la cellule ([cx], [cy]).
+void standAt(ShadowRelicGame game, int cx, int cy) => game.player.position
+    .setFrom(ShadowRelicGame.standOn(Vector2(cx * kTile, cy * kTile)));
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late InMemoryProgressRepository repo;
   setUp(() => repo = InMemoryProgressRepository());
 
-  test('le jeu démarre en pause sur le menu', () async {
-    final game =
-        await initializeGame(() => createGame(progressRepository: repo));
-    expect(game.paused, isTrue);
-    expect(game.player, isNotNull);
+  test('au lancement : mode démo derrière le menu, sans sauvegarde', () async {
+    final game = await loaded(repo);
+    expect(game.playing, isFalse);
+    expect(game.saveAvailable.value, isFalse);
+    final x0 = game.player.x;
+    await step(game, 1);
+    expect(game.player.x, x0, reason: 'le joueur ne bouge pas en démo');
   });
 
   test('nouvelle partie : le joueur tombe et se pose au sol', () async {
     final game = await started(repo);
-    expect(game.paused, isFalse);
+    expect(game.playing, isTrue);
     expect(game.overlays.isActive(Overlays.menu), isFalse);
     await step(game, 1);
     expect(game.player.onGround, isTrue);
@@ -77,7 +87,7 @@ void main() {
     final x0 = game.player.x;
     game.input.kbRight = true;
     await step(game, 0.5);
-    expect(game.player.x, greaterThan(x0 + 50));
+    expect(game.player.x, greaterThan(x0 + 2 * kTile));
   });
 
   test('ramasser l\'orbe de double saut débloque et sauvegarde', () async {
@@ -92,33 +102,65 @@ void main() {
     expect(orb.isMounted, isFalse);
   });
 
-  test('continuer : capacités et checkpoint restaurés, orbes retirées',
-      () async {
+  test('une pièce ramassée ne réapparaît pas après « Continuer »', () async {
+    var game = await started(repo);
+    final coin = game.world.children.whereType<Coin>().first;
+    game.player.position.setFrom(coin.position);
+    await step(game, 0.1);
+    expect(game.coins, 1);
+
+    game = await started(repo, continueSave: true);
+    expect(game.coins, 1);
+    expect(game.world.children.whereType<Coin>().map((c) => c.id),
+        isNot(contains(coin.id)));
+    expect(game.world.children.whereType<Coin>().length, game.totalCoins - 1);
+  });
+
+  test('continuer : capacités, checkpoint et drapeau restaurés', () async {
+    final cp = (await started(repo))
+        .grid
+        .spawns
+        .lastWhere((s) => s.type == SpawnType.checkpoint && s.cy == 21);
+    final respawn =
+        ShadowRelicGame.standOn(Vector2(cp.cx * kTile, cp.cy * kTile));
     repo.stored = GameProgress(
       abilities: {Ability.doubleJump, Ability.dash},
-      respawn: Vector2(86 * kTile + 5, 21 * kTile + 4),
-      coins: 3,
+      activatedCheckpoints: {cp.id},
+      respawn: respawn,
     );
     final game = await started(repo, continueSave: true);
     final orbs = game.world.children.whereType<AbilityOrb>().toList();
     expect(orbs.map((o) => o.ability), [Ability.wallJump]);
-    expect(game.player.position, Vector2(86 * kTile + 5, 21 * kTile + 4));
-    expect(game.coins, 3);
+    expect(game.player.position, respawn);
+    final flag = game.world.children
+        .whereType<Checkpoint>()
+        .firstWhere((c) => c.id == cp.id);
+    expect(flag.activated, isTrue);
   });
 
-  test('sans dash, la porte violette bloque le passage', () async {
+  test('toucher un checkpoint l\'allume et le sauvegarde', () async {
     final game = await started(repo);
-    game.player.position.setValues(77 * kTile, 21 * kTile + 3);
+    final flag = game.world.children.whereType<Checkpoint>().first;
+    game.player.position.setFrom(flag.position);
+    await step(game, 0.1);
+    expect(flag.activated, isTrue);
+    expect(repo.stored!.activatedCheckpoints, contains(flag.id));
+    expect(repo.stored!.respawn, isNotNull);
+  });
+
+  test('sans dash, la caisse bloque le passage', () async {
+    final game = await started(repo);
+    standAt(game, 78, 21);
     game.input.kbRight = true;
     await step(game, 1);
     expect(game.player.x + game.player.width, lessThanOrEqualTo(80 * kTile));
     expect(game.grid.at(80, 21), Tile.gate);
   });
 
-  test('le dash casse la porte violette', () async {
+  test('le dash brise la caisse', () async {
     repo.stored = GameProgress(abilities: {Ability.doubleJump, Ability.dash});
     final game = await started(repo, continueSave: true);
-    game.player.position.setValues(78 * kTile, 21 * kTile + 3);
+    standAt(game, 78, 21);
     await step(game, 0.3);
     game.input.kbRight = true;
     game.input.dashQueued = true;
@@ -130,10 +172,19 @@ void main() {
   test('les pics retirent un cœur et renvoient au point de départ', () async {
     final game = await started(repo);
     final start = game.respawnPoint.clone();
-    game.player.position.setValues(18 * kTile + 5, 25 * kTile);
+    game.player.position.setValues(18 * kTile + 2, 25 * kTile);
     await step(game, 1);
     expect(game.player.hp, game.player.maxHp - 1);
-    expect(game.player.position.x, closeTo(start.x, 40));
+    expect(game.player.position.x, closeTo(start.x, 2 * kTile));
+  });
+
+  test('mourir compte une mort et rend toute la vie', () async {
+    final game = await started(repo);
+    game.player.hp = 1;
+    game.player.takeDamage(from: game.player.position + Vector2(10, 0));
+    expect(game.player.hp, game.player.maxHp);
+    expect(game.progress.deaths, 1);
+    expect(repo.stored!.deaths, 1);
   });
 
   test('vaincre le Gardien déclenche l\'écran de victoire', () async {
@@ -144,12 +195,27 @@ void main() {
       boss.takeHit(1);
       await step(game, 0.3);
     }
-    await Future<void>.delayed(const Duration(seconds: 1));
+    expect(game.playing, isFalse);
+    await Future<void>.delayed(const Duration(milliseconds: 1600));
     expect(game.overlays.isActive(Overlays.victory), isTrue);
     expect(game.paused, isTrue);
 
     await game.replay();
+    expect(game.overlays.isActive(Overlays.victory), isFalse);
+    expect(game.playing, isTrue);
+    expect(game.coins, 0);
+  });
+
+  test('pause puis retour au menu : partie sauvegardée', () async {
+    final game = await started(repo);
+    await step(game, 0.5);
+    game.togglePause();
+    expect(game.paused, isTrue);
+    expect(game.overlays.isActive(Overlays.pause), isTrue);
+    await game.backToMenu();
+    expect(game.playing, isFalse);
     expect(game.overlays.isActive(Overlays.menu), isTrue);
-    expect(repo.stored, isNull);
+    expect(game.saveAvailable.value, isTrue);
+    expect(repo.stored!.playTime, greaterThan(0));
   });
 }

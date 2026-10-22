@@ -39,5 +39,5 @@ bool applyKeyboard(
   if (_jump.contains(k)) input.jumpQueued = true;
   if (_dash.contains(k)) input.dashQueued = true;
   if (_attack.contains(k)) input.attackQueued = true;
-  return k == LogicalKeyboardKey.escape;
+  return k == LogicalKeyboardKey.escape || k == LogicalKeyboardKey.keyP;
 }

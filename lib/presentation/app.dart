@@ -17,7 +17,9 @@ class ShadowRelicApp extends StatelessWidget {
     return MaterialApp(
       title: 'Shadow Relic',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true),
+      theme: ThemeData.dark(useMaterial3: true).copyWith(
+        textTheme: ThemeData.dark().textTheme.apply(fontFamily: 'KenneyMini'),
+      ),
       home: Scaffold(
         body: GameWidget<ShadowRelicGame>.controlled(
           gameFactory: gameFactory,

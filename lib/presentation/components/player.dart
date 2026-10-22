@@ -4,28 +4,32 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
+import '../../core/palette.dart';
 import '../../domain/entities/ability.dart';
 import '../../domain/entities/tile.dart';
 import '../../domain/physics/collision.dart';
 import '../game/shadow_relic_game.dart';
+import '../sprites/render_utils.dart';
 import 'fx.dart';
 
 class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
   Player({required Vector2 position})
-      : super(position: position, size: Vector2(22, 28));
+      : super(position: position, size: Vector2(14, 16));
 
-  // --- physique ---
-  static const gravity = 1500.0;
-  static const maxFall = 540.0;
-  static const moveSpeed = 165.0;
-  static const jumpVel = -470.0;
+  // --- physique (réglée en unités 32 px, voir kScale) ---
+  static const gravity = 1500.0 * kScale;
+  static const maxFall = 540.0 * kScale;
+  static const moveSpeed = 165.0 * kScale;
+  static const jumpVel = -470.0 * kScale;
+  static const jumpCutVel = -140.0 * kScale;
   static const coyoteTime = 0.10;
   static const jumpBufferTime = 0.14;
-  static const dashSpeed = 460.0;
+  static const dashSpeed = 460.0 * kScale;
   static const dashDuration = 0.16;
   static const dashCooldown = 0.45;
-  static const wallSlideMax = 90.0;
-  static const wallJumpVx = 235.0;
+  static const wallSlideMax = 90.0 * kScale;
+  static const wallJumpVx = 235.0 * kScale;
+  static const wallJumpVy = -440.0 * kScale;
   static const wallJumpLock = 0.14;
 
   final vel = Vector2.zero();
@@ -48,11 +52,16 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
   double _attackTimer = 0;
   final Set<Component> _hitThisSwing = {};
 
+  // --- rendu ---
   double _time = 0;
+  double _stretch = 0; // > 0 : étiré (saut), < 0 : écrasé (atterrissage)
+  double _ghostTimer = 0;
+  double _dustTimer = 0;
 
   @override
   void update(double dt) {
     super.update(dt);
+    if (!game.playing) return;
     if (dt > 0.05) dt = 0.05;
     _time += dt;
     final input = game.input;
@@ -63,6 +72,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     _invuln = math.max(0, _invuln - dt);
     _attackTimer = math.max(0, _attackTimer - dt);
     _wallLock = math.max(0, _wallLock - dt);
+    _stretch *= math.exp(-14 * dt);
 
     // ----- déplacement horizontal -----
     if (!dashing && _wallLock <= 0) {
@@ -81,13 +91,14 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
         _doJump();
       } else if (_wallSliding && game.abilities.contains(Ability.wallJump)) {
         // wall jump : on repousse du mur
-        vel.y = -440;
+        vel.y = wallJumpVy;
         vel.x = -_wallDir * wallJumpVx;
         facing = -_wallDir;
         _wallLock = wallJumpLock;
         _jumpBuffer = 0;
+        _stretch = 0.3;
         game.world.add(
-            Poof(position: position + Vector2(_wallDir > 0 ? width : 0, 10))
+            Poof(position: position + Vector2(_wallDir > 0 ? width : 0, 8))
               ..priority = 5);
       } else if (_airJumpsLeft > 0 &&
           game.abilities.contains(Ability.doubleJump)) {
@@ -98,7 +109,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
       }
     }
     // saut variable : relâcher = coupe l'ascension
-    if (!input.jumpHeld && vel.y < -140 && !dashing) vel.y = -140;
+    if (!input.jumpHeld && vel.y < jumpCutVel && !dashing) vel.y = jumpCutVel;
 
     // ----- dash -----
     if (input.consumeDash() &&
@@ -107,13 +118,24 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
         !dashing) {
       _dashTimer = dashDuration;
       _dashCd = dashCooldown;
-      game.world.add(Poof(position: position + Vector2(width / 2, height / 2))
-        ..priority = 5);
+      _stretch = -0.25;
+      game.shake(1.5, 0.12);
+      game.world.add(
+          Poof(position: position + Vector2(width / 2, height))..priority = 5);
     }
     if (dashing) {
       _dashTimer -= dt;
       vel.x = facing * dashSpeed;
       vel.y = 0;
+      _ghostTimer -= dt;
+      if (_ghostTimer <= 0) {
+        _ghostTimer = 0.03;
+        game.world.add(Afterimage(
+          position: position + Vector2(width / 2, height),
+          sprite: game.sprites.playerFrames[1],
+          flip: facing < 0,
+        ));
+      }
     } else {
       // gravité
       vel.y = math.min(vel.y + gravity * dt, maxFall);
@@ -129,19 +151,29 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
         _wallSliding = true;
         _wallDir = -1;
       }
-      if (_wallSliding) vel.y = math.min(vel.y, wallSlideMax);
+      if (_wallSliding) {
+        vel.y = math.min(vel.y, wallSlideMax);
+        _dustTimer -= dt;
+        if (_dustTimer <= 0) {
+          _dustTimer = 0.12;
+          game.world.add(Poof(
+            position: position + Vector2(_wallDir > 0 ? width : 0, height - 2),
+            small: true,
+          )..priority = 5);
+        }
+      }
     }
 
     // ----- attaque -----
     if (input.consumeAttack() && _attackTimer <= 0) {
       _attackTimer = 0.22;
       _hitThisSwing.clear();
-      game.world.add(SlashFx(owner: this, dir: facing)..priority = 5);
+      game.world.add(SlashFx(owner: this, dir: facing));
     }
     if (_attackTimer > 0.06) _applySlashDamage();
 
     // ----- collisions -----
-    final wasFalling = vel.y > 60;
+    final fallSpeed = vel.y;
     final hit = moveAndCollide(
       game.grid,
       position,
@@ -158,8 +190,8 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     );
 
     if (hit.down) {
-      if (wasFalling) {
-        // petite poussière d'atterrissage
+      if (!onGround && fallSpeed > 120 * kScale) {
+        _stretch = -0.35 * (fallSpeed / maxFall).clamp(0.4, 1.0);
         game.world.add(
             Poof(position: position + Vector2(width / 2, height), small: true)
               ..priority = 5);
@@ -186,13 +218,14 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     _jumpBuffer = 0;
     _coyote = 0;
     onGround = false;
+    _stretch = 0.3;
   }
 
   bool _touchingWall(int dir) {
-    final x = dir > 0 ? position.x + width + 2 : position.x - 2;
+    final x = dir > 0 ? position.x + width + 1 : position.x - 1;
     final cx = (x / kTile).floor();
-    final cy1 = ((position.y + 4) / kTile).floor();
-    final cy2 = ((position.y + height - 4) / kTile).floor();
+    final cy1 = ((position.y + 2) / kTile).floor();
+    final cy2 = ((position.y + height - 2) / kTile).floor();
     for (var cy = cy1; cy <= cy2; cy++) {
       if (game.grid.isSolid(cx, cy)) return true;
     }
@@ -200,9 +233,9 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
   }
 
   Rect get slashRect {
-    const w = 30.0, h = 26.0;
+    const w = 30.0 * kScale, h = 26.0 * kScale;
     final x = facing > 0 ? position.x + width : position.x - w;
-    return Rect.fromLTWH(x, position.y + 1, w, h);
+    return Rect.fromLTWH(x, position.y, w, h);
   }
 
   void _applySlashDamage() {
@@ -212,6 +245,8 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
       if (r.overlaps(e.toRect())) {
         _hitThisSwing.add(e);
         e.takeHit(1, facing.toDouble());
+        game.hitStop(0.05);
+        game.shake(1.5, 0.1);
       }
     }
     final b = game.boss;
@@ -220,7 +255,10 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
         !_hitThisSwing.contains(b) &&
         r.overlaps(b.toRect())) {
       _hitThisSwing.add(b);
-      b.takeHit(1);
+      if (b.takeHit(1)) {
+        game.hitStop(0.05);
+        game.shake(2, 0.12);
+      }
     }
   }
 
@@ -254,13 +292,15 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     _invuln = 1.1;
     _dashTimer = 0;
     final dir = position.x < from.x ? -1 : 1;
-    vel.x = dir * 220;
-    vel.y = -260;
+    vel.x = dir * 220 * kScale;
+    vel.y = -260 * kScale;
     _wallLock = 0.2;
+    game.hitStop(0.08);
+    game.shake(3, 0.25);
     game.world.add(ParticleBurst(
       position: position + size / 2,
-      color: const Color(0xFFE05263),
-      count: 8,
+      color: Palette.heart,
+      count: 10,
     )..priority = 5);
     if (hp <= 0) _die();
   }
@@ -269,6 +309,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     if (_invuln > 0) return;
     hp--;
     _invuln = 1.1;
+    game.shake(3, 0.2);
     if (hp <= 0) {
       _die();
     } else {
@@ -277,8 +318,15 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
   }
 
   void _die() {
+    game.world.add(ParticleBurst(
+      position: position + size / 2,
+      color: Palette.accent,
+      count: 24,
+      speed: 200,
+    )..priority = 5);
     hp = maxHp;
     game.boss?.resetFight();
+    game.onPlayerDeath();
     _respawn();
   }
 
@@ -286,49 +334,44 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     position.setFrom(game.respawnPoint);
     vel.setZero();
     _dashTimer = 0;
-    game.world.add(Poof(position: position + size / 2)..priority = 5);
+    game.world.add(
+        Poof(position: position + Vector2(width / 2, height))..priority = 5);
   }
 
   @override
   void render(Canvas canvas) {
     // clignote pendant l'invulnérabilité
-    if (_invuln > 0 && (_time * 12).floor().isEven) return;
+    if (_invuln > 0 && (_time * 14).floor().isEven) return;
 
-    final body = Paint()
-      ..color = dashing ? const Color(0xFF9BE8FF) : const Color(0xFF3FD1C0);
-    final rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 4, width, height - 4),
-      const Radius.circular(5),
-    );
-    // écharpe qui suit le mouvement
-    final scarf = Paint()..color = const Color(0xFFE0B34C);
-    final sway = -vel.x * 0.03 - facing * 5;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(width / 2 - 4 + sway, 8, 9, 6),
-        const Radius.circular(3),
-      ),
-      scarf,
-    );
-    canvas.drawRRect(rrect, body);
-    // tête / visière
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(3, 0, width - 6, 10),
-        const Radius.circular(4),
-      ),
-      Paint()..color = const Color(0xFF2A9D8F),
-    );
-    final eyeX = facing > 0 ? width - 9.0 : 4.0;
-    canvas.drawRect(
-      Rect.fromLTWH(eyeX, 3, 5, 4),
-      Paint()..color = const Color(0xFFEFFFFB),
-    );
-    if (_wallSliding) {
-      canvas.drawRect(
-        Rect.fromLTWH(_wallDir > 0 ? width - 2 : 0, 6, 2, height - 10),
-        Paint()..color = const Color(0xFFB6FFF4),
+    final frames = game.sprites.playerFrames;
+    final moving = vel.x.abs() > 1;
+    final frame = !onGround || dashing
+        ? frames[1]
+        : moving
+            ? frames[(_time * 9).floor() % 2]
+            : frames[0];
+
+    // respiration au repos, squash & stretch sinon
+    final idle = onGround && !moving ? math.sin(_time * 3) * 0.03 : 0.0;
+    final sy = 1 + _stretch + idle;
+    final sx = 1 - _stretch * 0.6;
+
+    // ombre portée
+    if (onGround) {
+      canvas.drawOval(
+        Rect.fromCenter(
+            center: Offset(width / 2, height), width: 14, height: 3),
+        Paint()..color = const Color(0x55000000),
       );
     }
+    final tilt = _wallSliding || dashing
+        ? 0.0
+        : (vel.x / moveSpeed).clamp(-1.0, 1.0) * 0.06;
+    canvas.save();
+    canvas.translate(width / 2, height);
+    canvas.rotate(tilt);
+    renderSpriteBottom(canvas, frame, 0, 0,
+        flip: facing < 0, scaleX: sx, scaleY: sy);
+    canvas.restore();
   }
 }

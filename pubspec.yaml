@@ -1,5 +1,5 @@
 name: shadow_relic
-description: "Shadow Relic - un Metroidvania complet en Flutter + Flame."
+description: "Shadow Relic : un Metroidvania complet en Flutter + Flame."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -21,3 +21,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
+  fonts:
+    - family: KenneyFuture
+      fonts:
+        - asset: assets/fonts/KenneyFuture.ttf
+    - family: KenneyMini
+      fonts:
+        - asset: assets/fonts/KenneyMiniSquare.ttf

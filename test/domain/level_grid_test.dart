@@ -37,28 +37,29 @@ void main() {
   group('moveAndCollide', () {
     test('la chute s\'arrête sur le sol', () {
       final g = parseAsciiLevel(['    ', '    ', 'XXXX']);
-      final pos = Vector2(10, 0);
-      final vel = Vector2(0, 600);
-      final hit = moveAndCollide(g, pos, Vector2(20, 28), vel, 0.1);
+      // un pas de déplacement reste inférieur à une tuile (comme à 60 fps)
+      final pos = Vector2(4, 2 * kTile - 16 - 5);
+      final vel = Vector2(0, 6 * kTile);
+      final hit = moveAndCollide(g, pos, Vector2(12, 16), vel, 0.1);
       expect(hit.down, isTrue);
       expect(vel.y, 0);
-      expect(pos.y + 28, closeTo(2 * kTile, 0.1));
+      expect(pos.y + 16, closeTo(2 * kTile, 0.1));
     });
 
     test('un mur bloque horizontalement', () {
       final g = parseAsciiLevel(['   X']);
-      final pos = Vector2(40, 0);
-      final vel = Vector2(500, 0);
-      final hit = moveAndCollide(g, pos, Vector2(20, 20), vel, 0.1);
+      final pos = Vector2(3 * kTile - 12 - 4, 0);
+      final vel = Vector2(6 * kTile, 0);
+      final hit = moveAndCollide(g, pos, Vector2(12, 12), vel, 0.1);
       expect(hit.right, isTrue);
-      expect(pos.x + 20, lessThanOrEqualTo(3 * kTile));
+      expect(pos.x + 12, lessThanOrEqualTo(3 * kTile));
     });
 
     test('onGateHit peut laisser passer une porte', () {
       final g = parseAsciiLevel(['  G ']);
-      final pos = Vector2(30, 0);
-      final vel = Vector2(400, 0);
-      final hit = moveAndCollide(g, pos, Vector2(20, 20), vel, 0.1,
+      final pos = Vector2(2 * kTile - 12 - 4, 0);
+      final vel = Vector2(6 * kTile, 0);
+      final hit = moveAndCollide(g, pos, Vector2(12, 12), vel, 0.1,
           onGateHit: (cx, cy) {
         g.clearGate(cx, cy);
         return true;

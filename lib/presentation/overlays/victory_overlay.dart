@@ -10,20 +10,57 @@ class VictoryOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OverlayPanel(
-      children: [
-        const Text('RELIQUE RÉCUPÉRÉE',
-            style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 3,
-                color: Palette.coin)),
-        const SizedBox(height: 10),
-        Text('Le Gardien est vaincu. ${game.coins} pièces récoltées.',
-            style: const TextStyle(color: Palette.textSoft)),
-        const SizedBox(height: 24),
-        OverlayButton('REJOUER', game.replay),
-      ],
+    final p = game.progress;
+    final allCoins = p.coins == game.totalCoins;
+    return BlurVeil(
+      opacity: 0.7,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const PopIn(child: GameTitle('VICTOIRE', size: 56)),
+            const SizedBox(height: 10),
+            PopIn(
+              delay: 0.15,
+              child: Text('Le Gardien est vaincu. La relique est à toi.',
+                  style: bodyStyle(15)),
+            ),
+            const SizedBox(height: 22),
+            PopIn(
+              delay: 0.3,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  StatTile(
+                      label: allCoins ? 'Toutes !' : 'Pièces',
+                      value: '${p.coins}/${game.totalCoins}',
+                      color: Palette.gold),
+                  const SizedBox(width: 12),
+                  StatTile(
+                      label: 'Temps',
+                      value: formatPlayTime(p.playTime),
+                      color: Palette.accent),
+                  const SizedBox(width: 12),
+                  StatTile(
+                      label: 'Morts',
+                      value: '${p.deaths}',
+                      color: Palette.danger),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            PopIn(
+              delay: 0.45,
+              child: Column(
+                children: [
+                  PixelButton('REJOUER', primary: true, onTap: game.replay),
+                  PixelButton('MENU PRINCIPAL', onTap: game.backToMenu),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

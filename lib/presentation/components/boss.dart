@@ -4,20 +4,24 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
+import '../../core/palette.dart';
 import '../../domain/physics/collision.dart';
 import '../game/shadow_relic_game.dart';
+import '../sprites/render_utils.dart';
 import 'fx.dart';
 
 class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
   Boss({required Vector2 position})
       : _spawn = position.clone(),
-        super(position: position, size: Vector2(52, 56));
+        super(position: position, size: Vector2.all(bossSize));
+
+  static const bossSize = 32.0;
+  static const maxHp = 24;
+  static const gravity = 1500.0 * kScale;
+  static const arenaLeftLimit = 106 * kTile;
+  static const windup = 0.35;
 
   final Vector2 _spawn;
-  static const maxHp = 24;
-  static const gravity = 1500.0;
-  static const arenaLeftLimit = 106 * kTile;
-
   int hp = maxHp;
   bool active = false;
   bool dead = false;
@@ -26,10 +30,12 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
   double _flash = 0;
   double _iframes = 0;
   double _t = 0;
+  double _squash = 0;
   bool _inAir = false;
   final List<Shockwave> shockwaves = [];
 
   double get hpRatio => hp / maxHp;
+  bool get enraged => hp <= maxHp / 2;
 
   @override
   void update(double dt) {
@@ -38,7 +44,8 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
     _t += dt;
     _flash = math.max(0, _flash - dt);
     _iframes = math.max(0, _iframes - dt);
-    if (dead) return;
+    _squash *= math.exp(-10 * dt);
+    if (dead || !game.playing) return;
 
     final player = game.player;
 
@@ -47,13 +54,14 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
       if (player.position.y < 9 * kTile &&
           (player.position.x - position.x).abs() < 9 * kTile) {
         active = true;
-        game.hud.showBanner('LE GARDIEN DE LA RELIQUE');
+        game.shake(3, 0.4);
+        game.hud.showBanner(
+            'LE GARDIEN DE LA RELIQUE\nDétruis-le pour récupérer la relique');
       }
       return;
     }
 
     // phase 2 : plus rapide sous 50% de vie
-    final enraged = hp <= maxHp / 2;
     final hopEvery = enraged ? 1.1 : 1.8;
 
     if (!_inAir) {
@@ -62,54 +70,64 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
       if (_hopTimer <= 0) {
         _hopTimer = hopEvery;
         final dir = player.position.x > position.x ? 1 : -1;
-        vel.x = dir * (enraged ? 190.0 : 140.0);
-        vel.y = -540;
+        vel.x = dir * (enraged ? 190.0 : 140.0) * kScale;
+        vel.y = -540 * kScale;
         _inAir = true;
+        _squash = 0.35;
       }
     }
-    vel.y = math.min(vel.y + gravity * dt, 600);
+    vel.y = math.min(vel.y + gravity * dt, 600 * kScale);
 
     final hit = moveAndCollide(game.grid, position, size, vel, dt);
-    position.x = position.x.clamp(arenaLeftLimit, game.grid.worldWidth - 80);
+    position.x =
+        position.x.clamp(arenaLeftLimit, game.grid.worldWidth - 3 * kTile);
 
     if (hit.down && _inAir) {
       _inAir = false;
       vel.x = 0;
-      _spawnShockwaves(enraged);
-      game.world.add(ParticleBurst(
-        position: position + Vector2(width / 2, height),
-        color: const Color(0xFFFF8C42),
-        count: 12,
-      )..priority = 5);
+      _squash = -0.4;
+      _spawnShockwaves();
+      game.shake(enraged ? 5 : 4, 0.3);
+      game.world.add(
+          Poof(position: position + Vector2(width / 2, height))..priority = 5);
     }
   }
 
-  void _spawnShockwaves(bool enraged) {
-    final y = position.y + height - 14;
+  void _spawnShockwaves() {
+    final y = position.y + height - Shockwave.h;
     for (final d in [-1, 1]) {
       final s = Shockwave(
-        position: Vector2(position.x + width / 2 + d * 30, y),
+        position: Vector2(position.x + width / 2 + d * 14 - Shockwave.w / 2, y),
         dir: d,
-        speed: enraged ? 230 : 175,
+        speed: (enraged ? 230 : 175) * kScale,
       )..priority = 3;
       shockwaves.add(s);
       game.world.add(s);
     }
   }
 
-  void takeHit(int dmg) {
-    if (dead || !active || _iframes > 0) return;
+  /// Retourne vrai si le coup a porté.
+  bool takeHit(int dmg) {
+    if (dead || !active || _iframes > 0) return false;
     hp -= dmg;
-    _flash = 0.12;
+    _flash = 0.1;
     _iframes = 0.25;
+    game.world.add(ParticleBurst(
+      position: position + size / 2,
+      color: Palette.boss,
+      count: 6,
+      glow: false,
+    )..priority = 5);
     if (hp <= 0) {
       dead = true;
       active = false;
+      game.shake(6, 0.6);
+      game.hitStop(0.2);
       game.world.add(ParticleBurst(
         position: position + size / 2,
-        color: const Color(0xFFFFD166),
-        count: 30,
-        speed: 220,
+        color: Palette.gold,
+        count: 40,
+        speed: 260,
       )..priority = 5);
       for (final s in shockwaves) {
         s.removeFromParent();
@@ -118,6 +136,7 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
       removeFromParent();
       game.onVictory();
     }
+    return true;
   }
 
   void resetFight() {
@@ -135,44 +154,42 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
 
   @override
   void render(Canvas canvas) {
-    final base = _flash > 0 ? Colors.white : const Color(0xFFD64550);
-    final breathe = math.sin(_t * 3) * 2;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, breathe, width, height - breathe),
-        const Radius.circular(10),
-      ),
-      Paint()..color = base,
+    final center = Offset(width / 2, height / 2);
+    if (active) {
+      drawGlow(canvas, center, 40, enraged ? Palette.danger : Palette.boss,
+          intensity: enraged ? 0.35 + 0.15 * math.sin(_t * 10) : 0.22);
+    }
+    // ombre au sol (rétrécit en l'air)
+    canvas.drawOval(
+      Rect.fromCenter(
+          center: Offset(width / 2, height),
+          width: _inAir ? 22 : 36,
+          height: 4),
+      Paint()..color = const Color(0x66000000),
     );
-    // cornes
-    final horn = Paint()..color = const Color(0xFF8E2430);
-    canvas.drawPath(
-      Path()
-        ..moveTo(6, 6)
-        ..lineTo(0, -8)
-        ..lineTo(14, 4)
-        ..close(),
-      horn,
-    );
-    canvas.drawPath(
-      Path()
-        ..moveTo(width - 6, 6)
-        ..lineTo(width, -8)
-        ..lineTo(width - 14, 4)
-        ..close(),
-      horn,
-    );
-    // oeil unique
-    final dir = game.player.position.x > position.x ? 1 : -1;
-    canvas.drawCircle(
-      Offset(width / 2 + dir * 6, 20 + breathe),
-      7,
-      Paint()..color = const Color(0xFFFFE9A0),
-    );
-    canvas.drawCircle(
-      Offset(width / 2 + dir * 9, 20 + breathe),
-      3,
-      Paint()..color = const Color(0xFF1B1B2F),
+
+    // prépare son saut : tremble juste avant de décoller
+    final aboutToHop = active && !_inAir && _hopTimer < windup;
+    final jitter = aboutToHop ? math.sin(_t * 80) * 1.0 : 0.0;
+    final breathe = math.sin(_t * 3) * 0.03;
+    final sy = 1 + _squash + breathe - (aboutToHop ? 0.12 : 0);
+    final sx = 1 - _squash * 0.5 + (aboutToHop ? 0.08 : 0);
+    final facingLeft = game.player.position.x < position.x;
+
+    renderSpriteBottom(
+      canvas,
+      enraged || aboutToHop ? game.sprites.bossAngry : game.sprites.bossCalm,
+      width / 2 + jitter,
+      height + 2,
+      size: 48,
+      flip: facingLeft,
+      scaleX: sx,
+      scaleY: sy,
+      paint: _flash > 0
+          ? solidPaint(Colors.white)
+          : enraged
+              ? huePaint(Palette.danger)
+              : null,
     );
   }
 }
@@ -180,7 +197,10 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
 class Shockwave extends PositionComponent
     with HasGameReference<ShadowRelicGame> {
   Shockwave({required Vector2 position, required this.dir, required this.speed})
-      : super(position: position, size: Vector2(22, 16));
+      : super(position: position, size: Vector2(w, h));
+
+  static const w = 12.0;
+  static const h = 10.0;
 
   final int dir;
   final double speed;
@@ -196,23 +216,31 @@ class Shockwave extends PositionComponent
     final cx = ((position.x + (dir > 0 ? width : 0)) / kTile).floor();
     final cy = ((position.y + height / 2) / kTile).floor();
     if (_life <= 0 || game.grid.isSolid(cx, cy)) {
-      final b = game.boss;
-      b?.shockwaves.remove(this);
+      game.boss?.shockwaves.remove(this);
+      game.world.add(
+          Poof(position: position + Vector2(width / 2, height), small: true)
+            ..priority = 5);
       removeFromParent();
     }
   }
 
   @override
   void render(Canvas canvas) {
-    final p = Paint()..color = const Color(0xFFFF8C42);
-    final h = 10 + math.sin(_t * 20) * 4;
+    drawGlow(canvas, Offset(width / 2, height), 16, Palette.shockwave,
+        intensity: 0.45);
+    final crest = 7 + math.sin(_t * 22) * 2.5;
+    final path = Path()
+      ..moveTo(0, height)
+      ..quadraticBezierTo(
+          width * (dir > 0 ? 0.7 : 0.3), height - crest * 1.6, width, height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = Palette.shockwave);
     canvas.drawPath(
-      Path()
-        ..moveTo(0, height)
-        ..lineTo(width / 2, height - h)
-        ..lineTo(width, height)
-        ..close(),
-      p,
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = const Color(0xFFFFE0A0),
     );
   }
 }

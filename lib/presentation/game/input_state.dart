@@ -14,6 +14,12 @@ class InputState {
   bool get right => kbRight || tRight;
   bool get jumpHeld => kbJumpHeld || tJumpHeld;
 
+  void clearQueued() {
+    jumpQueued = false;
+    dashQueued = false;
+    attackQueued = false;
+  }
+
   bool consumeJump() {
     final v = jumpQueued;
     jumpQueued = false;

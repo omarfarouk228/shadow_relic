@@ -27,4 +27,7 @@ class Spawn {
   final SpawnType type;
   final int cx;
   final int cy;
+
+  /// Identifiant stable, utilisé pour sauvegarder ce qui a été ramassé.
+  int get id => cy * 10000 + cx;
 }

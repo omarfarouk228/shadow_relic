@@ -4,31 +4,75 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
+import '../../core/palette.dart';
 import '../../domain/entities/level_grid.dart';
 import '../../domain/entities/tile.dart';
 import '../game/shadow_relic_game.dart';
 
-/// Dessine uniquement les tuiles visibles par la caméra.
+/// Dessine uniquement les tuiles visibles par la caméra, avec raccords
+/// d'herbe, contours, ombrage en profondeur et petites décorations.
 class TileRenderer extends Component with HasGameReference<ShadowRelicGame> {
   TileRenderer(this.grid);
 
   final LevelGrid grid;
 
-  static final _solid = Paint()..color = const Color(0xFF2A2F4A);
-  static final _solidTop = Paint()..color = const Color(0xFF3D4569);
-  static final _spike = Paint()..color = const Color(0xFFE05263);
-  static final _gate = Paint()..color = const Color(0xFF8E5CFF);
-  static final _gateLine = Paint()
-    ..color = const Color(0xFFC9B2FF)
-    ..strokeWidth = 2;
+  /// Décorations posées sur le sol : (cx, cy, index du sprite).
+  final List<(int, int, int)> _decor = [];
+
+  static final _outline = Paint()..color = Palette.outline;
+
+  /// Ombrage en profondeur : un dégradé par niveau (1 à 4 tuiles sous la
+  /// surface), en coordonnées locales de tuile.
+  static final _depthPaints = [
+    for (var d = 1; d <= 4; d++)
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color.fromRGBO(12, 6, 30, (d - 1) * 0.16),
+            Color.fromRGBO(12, 6, 30, math.min(4, d) * 0.16),
+          ],
+        ).createShader(const Rect.fromLTWH(0, 0, kTile, kTile)),
+  ];
+  static final _size = Vector2.all(kTile);
+
+  @override
+  Future<void> onLoad() async {
+    final rng = math.Random(1234);
+    final spawnCells = {for (final s in grid.spawns) (s.cx, s.cy)};
+    for (var cy = 1; cy < grid.rows; cy++) {
+      for (var cx = 1; cx < grid.cols - 1; cx++) {
+        if (grid.at(cx, cy) != Tile.solid) continue;
+        if (grid.at(cx, cy - 1) != Tile.empty) continue;
+        if (spawnCells.contains((cx, cy - 1))) continue;
+        if (rng.nextDouble() < 0.18) {
+          _decor.add((cx, cy - 1, rng.nextInt(4)));
+        }
+      }
+    }
+  }
+
+  bool _solid(int cx, int cy) => grid.at(cx, cy) == Tile.solid;
+
+  /// Nombre de tuiles pleines au-dessus (0 = surface), plafonné à 4.
+  int _depthOf(int cx, int cy) {
+    var d = 0;
+    while (d < 4 && _solid(cx, cy - d - 1) && cy - d - 1 >= 0) {
+      d++;
+    }
+    return d;
+  }
 
   @override
   void render(Canvas canvas) {
+    final s = game.sprites;
     final view = game.camera.visibleWorldRect;
     final x1 = math.max(0, (view.left / kTile).floor() - 1);
     final x2 = math.min(grid.cols - 1, (view.right / kTile).ceil() + 1);
     final y1 = math.max(0, (view.top / kTile).floor() - 1);
     final y2 = math.min(grid.rows - 1, (view.bottom / kTile).ceil() + 1);
+    final pos = Vector2.zero();
 
     for (var cy = y1; cy <= y2; cy++) {
       for (var cx = x1; cx <= x2; cx++) {
@@ -36,68 +80,60 @@ class TileRenderer extends Component with HasGameReference<ShadowRelicGame> {
         if (t == Tile.empty) continue;
         final px = cx * kTile;
         final py = cy * kTile;
+        pos.setValues(px, py);
         switch (t) {
           case Tile.solid:
-            canvas.drawRect(Rect.fromLTWH(px, py, kTile, kTile), _solid);
-            // liseré clair sur la face exposée au ciel
-            if (!grid.isSolid(cx, cy - 1)) {
-              canvas.drawRect(Rect.fromLTWH(px, py, kTile, 5), _solidTop);
+            final topOpen = grid.at(cx, cy - 1) == Tile.empty;
+            if (topOpen) {
+              final l = _solid(cx - 1, cy);
+              final r = _solid(cx + 1, cy);
+              final sprite = l && r
+                  ? s.grassMid
+                  : l
+                      ? s.grassRight
+                      : r
+                          ? s.grassLeft
+                          : s.grassSingle;
+              sprite.render(canvas, position: pos, size: _size);
+            } else {
+              s.dirt[(cx * 7 + cy * 13) % s.dirt.length]
+                  .render(canvas, position: pos, size: _size);
+              final d = _depthOf(cx, cy);
+              if (d > 0) {
+                canvas.save();
+                canvas.translate(px, py);
+                canvas.drawRect(const Rect.fromLTWH(0, 0, kTile, kTile),
+                    _depthPaints[d - 1]);
+                canvas.restore();
+              }
+            }
+            // contours sur les faces exposées
+            if (!_solid(cx - 1, cy) && !topOpen) {
+              canvas.drawRect(Rect.fromLTWH(px, py, 1, kTile), _outline);
+            }
+            if (!_solid(cx + 1, cy) && !topOpen) {
+              canvas.drawRect(
+                  Rect.fromLTWH(px + kTile - 1, py, 1, kTile), _outline);
+            }
+            if (!_solid(cx, cy + 1)) {
+              canvas.drawRect(
+                  Rect.fromLTWH(px, py + kTile - 1, kTile, 1), _outline);
             }
           case Tile.spike:
-            for (var i = 0; i < 2; i++) {
-              final sx = px + i * 16.0;
-              canvas.drawPath(
-                Path()
-                  ..moveTo(sx, py + kTile)
-                  ..lineTo(sx + 8, py + 10)
-                  ..lineTo(sx + 16, py + kTile)
-                  ..close(),
-                _spike,
-              );
-            }
+            s.spike.render(canvas, position: pos, size: _size);
           case Tile.gate:
-            canvas.drawRect(Rect.fromLTWH(px + 4, py, kTile - 8, kTile), _gate);
-            canvas.drawLine(Offset(px + 10, py + 6),
-                Offset(px + kTile - 10, py + kTile - 6), _gateLine);
+            s.gate.render(canvas, position: pos, size: _size);
           case Tile.empty:
             break;
         }
       }
     }
-  }
-}
 
-/// Ciel étoilé avec léger effet de parallaxe.
-class BackgroundStars extends Component with HasGameReference<ShadowRelicGame> {
-  BackgroundStars(LevelGrid grid) {
-    final rng = math.Random(42);
-    for (var i = 0; i < 140; i++) {
-      _stars.add(Offset(
-        rng.nextDouble() * grid.worldWidth,
-        rng.nextDouble() * grid.worldHeight,
-      ));
-      _sizes.add(0.8 + rng.nextDouble() * 1.6);
-    }
-  }
-
-  final List<Offset> _stars = [];
-  final List<double> _sizes = [];
-  final _paint = Paint()..color = const Color(0x88AAB4E8);
-
-  @override
-  void render(Canvas canvas) {
-    final view = game.camera.visibleWorldRect;
-    // parallaxe : les étoiles "suivent" un peu la caméra
-    final shift = Offset(view.left * 0.6, view.top * 0.6);
-    for (var i = 0; i < _stars.length; i++) {
-      final p = _stars[i] * 0.4 + shift;
-      if (p.dx < view.left - 4 ||
-          p.dx > view.right + 4 ||
-          p.dy < view.top - 4 ||
-          p.dy > view.bottom + 4) {
-        continue;
-      }
-      canvas.drawCircle(p, _sizes[i], _paint);
+    for (final (cx, cy, i) in _decor) {
+      if (cx < x1 || cx > x2 || cy < y1 || cy > y2) continue;
+      if (grid.at(cx, cy) != Tile.empty) continue;
+      pos.setValues(cx * kTile, cy * kTile);
+      s.decorations[i].render(canvas, position: pos, size: _size);
     }
   }
 }

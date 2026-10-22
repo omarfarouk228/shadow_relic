@@ -11,6 +11,14 @@ class LoadProgress {
       await _repository.load() ?? GameProgress();
 }
 
+class HasSavedProgress {
+  const HasSavedProgress(this._repository);
+
+  final ProgressRepository _repository;
+
+  Future<bool> call() async => await _repository.load() != null;
+}
+
 class SaveProgress {
   const SaveProgress(this._repository);
 

@@ -4,23 +4,25 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
+import '../../core/palette.dart';
 import '../../domain/physics/collision.dart';
 import '../game/shadow_relic_game.dart';
+import '../sprites/render_utils.dart';
 import 'fx.dart';
 
 class Enemy extends PositionComponent with HasGameReference<ShadowRelicGame> {
   Enemy({required Vector2 position})
-      : super(position: position, size: Vector2(26, 26));
+      : super(position: position, size: Vector2(14, 11));
 
-  static const speed = 42.0;
-  static const gravity = 1400.0;
+  static const speed = 42.0 * kScale;
+  static const gravity = 1400.0 * kScale;
 
   final vel = Vector2.zero();
   int dir = 1;
   int hp = 2;
   double _flash = 0;
   double _knock = 0;
-  double _t = 0;
+  double _t = math.Random().nextDouble();
 
   @override
   void update(double dt) {
@@ -31,7 +33,7 @@ class Enemy extends PositionComponent with HasGameReference<ShadowRelicGame> {
     _knock = math.max(0, _knock - dt);
 
     if (_knock <= 0) vel.x = dir * speed;
-    vel.y = math.min(vel.y + gravity * dt, 520);
+    vel.y = math.min(vel.y + gravity * dt, 520 * kScale);
 
     final hit = moveAndCollide(game.grid, position, size, vel, dt);
 
@@ -40,25 +42,32 @@ class Enemy extends PositionComponent with HasGameReference<ShadowRelicGame> {
 
     // demi-tour au bord d'une plateforme
     if (hit.down && _knock <= 0) {
-      final aheadX = dir > 0 ? position.x + width + 2 : position.x - 2;
+      final aheadX = dir > 0 ? position.x + width + 1 : position.x - 1;
       final cx = (aheadX / kTile).floor();
-      final cy = ((position.y + height + 4) / kTile).floor();
+      final cy = ((position.y + height + 2) / kTile).floor();
       if (!game.grid.isSolid(cx, cy)) dir = -dir;
     }
   }
 
   void takeHit(int dmg, double fromDir) {
     hp -= dmg;
-    _flash = 0.15;
+    _flash = 0.12;
     _knock = 0.25;
-    vel.x = fromDir * 190;
-    vel.y = -160;
+    vel.x = fromDir * 190 * kScale;
+    vel.y = -160 * kScale;
+    game.world.add(ParticleBurst(
+      position: position + size / 2,
+      color: Palette.enemyHit,
+      count: 5,
+      glow: false,
+    )..priority = 5);
     if (hp <= 0) {
       game.enemies.remove(this);
       game.world.add(ParticleBurst(
         position: position + size / 2,
-        color: const Color(0xFFC96BFF),
-        count: 10,
+        color: Palette.enemyHit,
+        count: 14,
+        speed: 170,
       )..priority = 5);
       removeFromParent();
     }
@@ -66,25 +75,19 @@ class Enemy extends PositionComponent with HasGameReference<ShadowRelicGame> {
 
   @override
   void render(Canvas canvas) {
-    final c = _flash > 0 ? Colors.white : const Color(0xFF9B4DE0);
-    final bob = math.sin(_t * 6) * 1.5;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 4 + bob, width, height - 4 - bob),
-        const Radius.circular(8),
-      ),
-      Paint()..color = c,
+    final frames = game.sprites.crawlerFrames;
+    final frame = frames[(_t * 6).floor() % 2];
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(width / 2, height), width: 14, height: 3),
+      Paint()..color = const Color(0x55000000),
     );
-    // yeux
-    final eye = Paint()..color = const Color(0xFFFFE9A0);
-    final off = dir > 0 ? 4.0 : -4.0;
-    canvas.drawCircle(Offset(width / 2 - 5 + off, 12 + bob), 2.4, eye);
-    canvas.drawCircle(Offset(width / 2 + 5 + off, 12 + bob), 2.4, eye);
-    // pattes
-    final leg = Paint()..color = const Color(0xFF6B2FA8);
-    for (var i = 0; i < 3; i++) {
-      final lx = 4.0 + i * 8 + math.sin(_t * 10 + i) * 2;
-      canvas.drawRect(Rect.fromLTWH(lx, height - 4, 4, 4), leg);
-    }
+    renderSpriteBottom(
+      canvas,
+      frame,
+      width / 2,
+      height + 1,
+      flip: dir < 0,
+      paint: _flash > 0 ? solidPaint(Colors.white) : null,
+    );
   }
 }

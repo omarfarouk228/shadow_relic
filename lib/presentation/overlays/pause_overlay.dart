@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/palette.dart';
 import '../game/shadow_relic_game.dart';
 import 'overlay_widgets.dart';
 
@@ -9,15 +10,41 @@ class PauseOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OverlayPanel(
-      children: [
-        const Text('PAUSE',
-            style: TextStyle(
-                fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 4)),
-        const SizedBox(height: 20),
-        OverlayButton('REPRENDRE', game.togglePause),
-        OverlayButton('MENU PRINCIPAL', game.backToMenu, primary: false),
-      ],
+    final p = game.progress;
+    return BlurVeil(
+      child: PopIn(
+        child: GamePanel(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('PAUSE', style: titleStyle(36)),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  StatTile(
+                      label: 'Pièces',
+                      value: '${p.coins}/${game.totalCoins}',
+                      color: Palette.gold),
+                  const SizedBox(width: 10),
+                  StatTile(
+                      label: 'Temps',
+                      value: formatPlayTime(p.playTime),
+                      color: Palette.accent),
+                  const SizedBox(width: 10),
+                  StatTile(
+                      label: 'Morts',
+                      value: '${p.deaths}',
+                      color: Palette.danger),
+                ],
+              ),
+              const SizedBox(height: 18),
+              PixelButton('REPRENDRE', primary: true, onTap: game.togglePause),
+              PixelButton('MENU PRINCIPAL', onTap: game.backToMenu),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -3,11 +3,12 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-import '../game/level_grid.dart';
-import '../game/mv_game.dart';
+import '../../core/constants.dart';
+import '../../domain/physics/collision.dart';
+import '../game/shadow_relic_game.dart';
 import 'fx.dart';
 
-class Boss extends PositionComponent with HasGameReference<MvGame> {
+class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
   Boss({required Vector2 position})
       : _spawn = position.clone(),
         super(position: position, size: Vector2(52, 56));
@@ -176,7 +177,8 @@ class Boss extends PositionComponent with HasGameReference<MvGame> {
   }
 }
 
-class Shockwave extends PositionComponent with HasGameReference<MvGame> {
+class Shockwave extends PositionComponent
+    with HasGameReference<ShadowRelicGame> {
   Shockwave({required Vector2 position, required this.dir, required this.speed})
       : super(position: position, size: Vector2(22, 16));
 

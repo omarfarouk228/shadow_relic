@@ -1,79 +1,8 @@
-import 'package:flame/components.dart';
-import 'level_data.dart';
+import 'package:vector_math/vector_math.dart';
 
-const double kTile = 32.0;
-
-enum Tile { empty, solid, spike, gate }
-
-enum Ability { doubleJump, dash, wallJump }
-
-class Spawn {
-  final String type;
-  final Vector2 pos; // coin bas-gauche de la cellule -> converti par le jeu
-  Spawn(this.type, this.pos);
-}
-
-class LevelGrid {
-  late final int cols;
-  late final int rows;
-  late final List<List<Tile>> tiles;
-  final List<Spawn> spawns = [];
-
-  LevelGrid.parse() {
-    rows = levelRows.length;
-    cols = levelRows.map((r) => r.length).reduce((a, b) => a > b ? a : b);
-    tiles = List.generate(rows, (_) => List.filled(cols, Tile.empty));
-    for (var y = 0; y < rows; y++) {
-      final line = levelRows[y].padRight(cols, ' ');
-      for (var x = 0; x < cols; x++) {
-        final c = line[x];
-        switch (c) {
-          case 'X':
-            tiles[y][x] = Tile.solid;
-          case '^':
-            tiles[y][x] = Tile.spike;
-          case 'G':
-            tiles[y][x] = Tile.gate;
-          case ' ':
-            break;
-          default:
-            spawns.add(Spawn(c, Vector2(x * kTile, y * kTile)));
-        }
-      }
-    }
-  }
-
-  double get worldWidth => cols * kTile;
-  double get worldHeight => rows * kTile;
-
-  Tile at(int cx, int cy) {
-    if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) return Tile.solid;
-    return tiles[cy][cx];
-  }
-
-  bool isSolid(int cx, int cy) {
-    final t = at(cx, cy);
-    return t == Tile.solid || t == Tile.gate;
-  }
-
-  void clearGate(int cx, int cy) {
-    if (at(cx, cy) == Tile.gate) tiles[cy][cx] = Tile.empty;
-  }
-
-  /// Vrai si le rectangle touche au moins une tuile de type [t].
-  bool rectTouches(double left, double top, double w, double h, Tile t) {
-    final x1 = (left / kTile).floor();
-    final x2 = ((left + w - 0.01) / kTile).floor();
-    final y1 = (top / kTile).floor();
-    final y2 = ((top + h - 0.01) / kTile).floor();
-    for (var cy = y1; cy <= y2; cy++) {
-      for (var cx = x1; cx <= x2; cx++) {
-        if (at(cx, cy) == t) return true;
-      }
-    }
-    return false;
-  }
-}
+import '../../core/constants.dart';
+import '../entities/level_grid.dart';
+import '../entities/tile.dart';
 
 class HitInfo {
   bool left = false, right = false, up = false, down = false;

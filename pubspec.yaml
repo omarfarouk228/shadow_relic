@@ -11,11 +11,13 @@ dependencies:
     sdk: flutter
   flame: ^1.18.0
   shared_preferences: ^2.2.3
+  vector_math: ^2.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flame_test: ^2.3.1
 
 flutter:
   uses-material-design: true

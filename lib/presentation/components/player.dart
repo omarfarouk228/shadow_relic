@@ -3,13 +3,14 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-import '../game/level_grid.dart';
-import '../game/mv_game.dart';
-import 'boss.dart';
-import 'enemy.dart';
+import '../../core/constants.dart';
+import '../../domain/entities/ability.dart';
+import '../../domain/entities/tile.dart';
+import '../../domain/physics/collision.dart';
+import '../game/shadow_relic_game.dart';
 import 'fx.dart';
 
-class Player extends PositionComponent with HasGameReference<MvGame> {
+class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
   Player({required Vector2 position})
       : super(position: position, size: Vector2(22, 28));
 
@@ -78,8 +79,7 @@ class Player extends PositionComponent with HasGameReference<MvGame> {
     if (_jumpBuffer > 0) {
       if (onGround || _coyote > 0) {
         _doJump();
-      } else if (_wallSliding &&
-          game.abilities.contains(Ability.wallJump)) {
+      } else if (_wallSliding && game.abilities.contains(Ability.wallJump)) {
         // wall jump : on repousse du mur
         vel.y = -440;
         vel.x = -_wallDir * wallJumpVx;
@@ -93,9 +93,8 @@ class Player extends PositionComponent with HasGameReference<MvGame> {
           game.abilities.contains(Ability.doubleJump)) {
         _airJumpsLeft--;
         _doJump();
-        game.world
-            .add(Poof(position: position + Vector2(width / 2, height))
-              ..priority = 5);
+        game.world.add(Poof(position: position + Vector2(width / 2, height))
+          ..priority = 5);
       }
     }
     // saut variable : relâcher = coupe l'ascension
@@ -122,9 +121,7 @@ class Player extends PositionComponent with HasGameReference<MvGame> {
 
     // ----- wall slide -----
     _wallSliding = false;
-    if (!onGround &&
-        vel.y > 0 &&
-        game.abilities.contains(Ability.wallJump)) {
+    if (!onGround && vel.y > 0 && game.abilities.contains(Ability.wallJump)) {
       if (input.right && _touchingWall(1)) {
         _wallSliding = true;
         _wallDir = 1;

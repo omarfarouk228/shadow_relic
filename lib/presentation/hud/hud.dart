@@ -1,11 +1,11 @@
 import 'package:flame/components.dart';
-import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
 
-import '../game/level_grid.dart';
-import '../game/mv_game.dart';
+import '../../domain/entities/ability.dart';
+import '../game/shadow_relic_game.dart';
+import 'touch_controls.dart';
 
-class Hud extends PositionComponent with HasGameReference<MvGame> {
+class Hud extends PositionComponent with HasGameReference<ShadowRelicGame> {
   Hud() : super(size: Vector2(640, 360), priority: 100);
 
   String _banner = '';
@@ -29,8 +29,10 @@ class Hud extends PositionComponent with HasGameReference<MvGame> {
 
   @override
   Future<void> onLoad() async {
-    _addTouchControls();
+    add(TouchControls(game.input));
   }
+
+  void clearBanner() => _bannerT = 0;
 
   void showBanner(String text) {
     _banner = text;
@@ -81,7 +83,7 @@ class Hud extends PositionComponent with HasGameReference<MvGame> {
       const w = 260.0;
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(320 - w / 2, 12, w, 12),
+          const Rect.fromLTWH(320 - w / 2, 12, w, 12),
           const Radius.circular(6),
         ),
         Paint()..color = const Color(0xFF2A2F4A),
@@ -98,7 +100,8 @@ class Hud extends PositionComponent with HasGameReference<MvGame> {
     // ---- bannière ----
     if (_bannerT > 0 && _banner.isNotEmpty) {
       final o = (_bannerT.clamp(0.0, 0.5)) / 0.5;
-      canvas.saveLayer(null, Paint()..color = Colors.white.withOpacity(o));
+      canvas.saveLayer(
+          null, Paint()..color = Colors.white.withValues(alpha: o));
       _bannerPaint.render(
         canvas,
         _banner,
@@ -120,104 +123,6 @@ class Hud extends PositionComponent with HasGameReference<MvGame> {
         ..lineTo(at.dx + 7, at.dy + 1.5)
         ..close(),
       p,
-    );
-  }
-
-  // ---------- boutons tactiles ----------
-
-  void _addTouchControls() {
-    final input = game.input;
-
-    ButtonComponent btn({
-      required Vector2 pos,
-      required String label,
-      required void Function() down,
-      required void Function() up,
-      double radius = 26,
-    }) {
-      return ButtonComponent(
-        position: pos,
-        size: Vector2.all(radius * 2),
-        anchor: Anchor.center,
-        button: _TouchCircle(label: label, radius: radius, pressed: false),
-        buttonDown: _TouchCircle(label: label, radius: radius, pressed: true),
-        onPressed: down,
-        onReleased: up,
-        onCancelled: up,
-      );
-    }
-
-    addAll([
-      btn(
-        pos: Vector2(46, 320),
-        label: '◀',
-        down: () => input.tLeft = true,
-        up: () => input.tLeft = false,
-      ),
-      btn(
-        pos: Vector2(112, 320),
-        label: '▶',
-        down: () => input.tRight = true,
-        up: () => input.tRight = false,
-      ),
-      btn(
-        pos: Vector2(594, 316),
-        label: '⭡',
-        down: () {
-          input.tJumpHeld = true;
-          input.jumpQueued = true;
-        },
-        up: () => input.tJumpHeld = false,
-        radius: 28,
-      ),
-      btn(
-        pos: Vector2(532, 330),
-        label: '⚡',
-        down: () => input.dashQueued = true,
-        up: () {},
-        radius: 22,
-      ),
-      btn(
-        pos: Vector2(548, 274),
-        label: '✦',
-        down: () => input.attackQueued = true,
-        up: () {},
-        radius: 22,
-      ),
-    ]);
-  }
-}
-
-class _TouchCircle extends PositionComponent {
-  _TouchCircle({
-    required this.label,
-    required this.radius,
-    required this.pressed,
-  }) : super(size: Vector2.all(radius * 2));
-
-  final String label;
-  final double radius;
-  final bool pressed;
-
-  static final _text = TextPaint(
-    style: const TextStyle(color: Colors.white, fontSize: 18),
-  );
-
-  @override
-  void render(Canvas canvas) {
-    canvas.drawCircle(
-      Offset(radius, radius),
-      radius,
-      Paint()
-        ..color = pressed
-            ? const Color(0x66FFFFFF)
-            : const Color(0x2EFFFFFF),
-    );
-    _text.render(
-      canvas,
-      label,
-      Vector2(radius, radius),
-      anchor: Anchor.center,
     );
   }
 }

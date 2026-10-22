@@ -1,4 +1,4 @@
-/// Carte du monde — 124x30 tuiles de 32px.
+/// Carte du monde : 124x30 tuiles de 32px.
 /// X=solide  ^=pics  G=porte cassable (dash)  P=spawn  C=checkpoint
 /// e=ennemi  B=boss  o=piece  h=coeur  J=double saut  H=dash  W=wall jump
 const List<String> levelRows = [

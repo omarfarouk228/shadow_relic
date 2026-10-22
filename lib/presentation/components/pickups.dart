@@ -3,16 +3,17 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-import '../game/level_grid.dart';
-import '../game/mv_game.dart';
+import '../../core/constants.dart';
+import '../../domain/entities/ability.dart';
+import '../game/shadow_relic_game.dart';
 import 'fx.dart';
 
 abstract class _Pickup extends PositionComponent
-    with HasGameReference<MvGame> {
+    with HasGameReference<ShadowRelicGame> {
   _Pickup({required Vector2 cellTopLeft, required Vector2 size})
       : super(
-          position: cellTopLeft +
-              Vector2((kTile - size.x) / 2, (kTile - size.y) / 2),
+          position:
+              cellTopLeft + Vector2((kTile - size.x) / 2, (kTile - size.y) / 2),
           size: size,
         );
 
@@ -29,8 +30,7 @@ abstract class _Pickup extends PositionComponent
 }
 
 class Coin extends _Pickup {
-  Coin({required Vector2 cellTopLeft})
-      : super(cellTopLeft: cellTopLeft, size: Vector2.all(14));
+  Coin({required super.cellTopLeft}) : super(size: Vector2.all(14));
 
   @override
   void onCollect() {
@@ -61,8 +61,7 @@ class Coin extends _Pickup {
 }
 
 class HeartPickup extends _Pickup {
-  HeartPickup({required Vector2 cellTopLeft})
-      : super(cellTopLeft: cellTopLeft, size: Vector2.all(18));
+  HeartPickup({required super.cellTopLeft}) : super(size: Vector2.all(18));
 
   @override
   void onCollect() {
@@ -89,8 +88,8 @@ class HeartPickup extends _Pickup {
 }
 
 class AbilityOrb extends _Pickup {
-  AbilityOrb({required Vector2 cellTopLeft, required this.ability})
-      : super(cellTopLeft: cellTopLeft, size: Vector2.all(22));
+  AbilityOrb({required super.cellTopLeft, required this.ability})
+      : super(size: Vector2.all(22));
 
   final Ability ability;
 
@@ -120,18 +119,19 @@ class AbilityOrb extends _Pickup {
     canvas.drawCircle(
       c,
       13 + math.sin(t * 4) * 2,
-      Paint()..color = color.withOpacity(0.25),
+      Paint()..color = color.withValues(alpha: 0.25),
     );
     canvas.drawCircle(c, 9, Paint()..color = color);
     canvas.drawCircle(
       c.translate(-2, -2),
       3,
-      Paint()..color = Colors.white.withOpacity(0.85),
+      Paint()..color = Colors.white.withValues(alpha: 0.85),
     );
   }
 }
 
-class Checkpoint extends PositionComponent with HasGameReference<MvGame> {
+class Checkpoint extends PositionComponent
+    with HasGameReference<ShadowRelicGame> {
   Checkpoint({required Vector2 cellTopLeft})
       : super(position: cellTopLeft, size: Vector2(kTile, kTile));
 
@@ -162,15 +162,13 @@ class Checkpoint extends PositionComponent with HasGameReference<MvGame> {
   void render(Canvas canvas) {
     // poteau
     canvas.drawRect(
-      Rect.fromLTWH(kTile / 2 - 2, 4, 4, kTile - 4),
+      const Rect.fromLTWH(kTile / 2 - 2, 4, 4, kTile - 4),
       Paint()..color = const Color(0xFF5A6178),
     );
     // flamme (cyan si actif)
     final flame = Paint()
-      ..color = activated
-          ? const Color(0xFF4CC9F0)
-          : const Color(0xFF3A3F55);
+      ..color = activated ? const Color(0xFF4CC9F0) : const Color(0xFF3A3F55);
     final fh = activated ? 8 + math.sin(t * 8) * 2 : 7.0;
-    canvas.drawCircle(Offset(kTile / 2, 4), fh, flame);
+    canvas.drawCircle(const Offset(kTile / 2, 4), fh, flame);
   }
 }

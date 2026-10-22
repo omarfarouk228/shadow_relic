@@ -28,7 +28,7 @@ class Poof extends PositionComponent {
     canvas.drawCircle(
       Offset.zero,
       r,
-      Paint()..color = Colors.white.withOpacity(0.5 * (1 - p)),
+      Paint()..color = Colors.white.withValues(alpha: 0.5 * (1 - p)),
     );
   }
 }
@@ -61,7 +61,7 @@ class SlashFx extends PositionComponent {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4 * (1 - p) + 1.5
       ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFFEFFFFB).withOpacity(1 - p);
+      ..color = const Color(0xFFEFFFFB).withValues(alpha: 1 - p);
     final rect = Rect.fromCircle(center: Offset.zero, radius: 16);
     final start = dir > 0 ? -math.pi / 2.2 : math.pi - math.pi / 1.9;
     canvas.drawArc(rect, start + p * 0.6 * dir, math.pi * 0.85, false, paint);
@@ -117,7 +117,7 @@ class ParticleBurst extends PositionComponent {
       canvas.drawRect(
         Rect.fromCenter(
             center: Offset(p.pos.x, p.pos.y), width: p.size, height: p.size),
-        Paint()..color = color.withOpacity(o),
+        Paint()..color = color.withValues(alpha: o),
       );
     }
   }

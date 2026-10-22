@@ -3,11 +3,13 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-import '../game/level_grid.dart';
-import '../game/mv_game.dart';
+import '../../core/constants.dart';
+import '../../domain/entities/level_grid.dart';
+import '../../domain/entities/tile.dart';
+import '../game/shadow_relic_game.dart';
 
 /// Dessine uniquement les tuiles visibles par la caméra.
-class TileRenderer extends Component with HasGameReference<MvGame> {
+class TileRenderer extends Component with HasGameReference<ShadowRelicGame> {
   TileRenderer(this.grid);
 
   final LevelGrid grid;
@@ -66,7 +68,7 @@ class TileRenderer extends Component with HasGameReference<MvGame> {
 }
 
 /// Ciel étoilé avec léger effet de parallaxe.
-class BackgroundStars extends Component with HasGameReference<MvGame> {
+class BackgroundStars extends Component with HasGameReference<ShadowRelicGame> {
   BackgroundStars(LevelGrid grid) {
     final rng = math.Random(42);
     for (var i = 0; i < 140; i++) {

@@ -3,11 +3,12 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-import '../game/level_grid.dart';
-import '../game/mv_game.dart';
+import '../../core/constants.dart';
+import '../../domain/physics/collision.dart';
+import '../game/shadow_relic_game.dart';
 import 'fx.dart';
 
-class Enemy extends PositionComponent with HasGameReference<MvGame> {
+class Enemy extends PositionComponent with HasGameReference<ShadowRelicGame> {
   Enemy({required Vector2 position})
       : super(position: position, size: Vector2(26, 26));
 

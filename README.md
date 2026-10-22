@@ -1,14 +1,14 @@
 # Shadow Relic 🗡️
 
-Metroidvania complet en **Flutter + Flame**, en pixel art, avec bruitages et musique chiptune
-(assets Kenney et Juhani Junkala, licence CC0).
+Metroidvania complet en **Flutter + Flame**, en pixel art, avec 3 héros jouables, bruitages et
+musique chiptune (assets CC0 : Kenney, PixiVan, DezrasDragons, Juhani Junkala).
 Compile et tourne tel quel sur mobile, desktop et web.
 
 ![Écran titre](docs/screenshots/menu.png)
 
-| Exploration | Dash | Le Gardien |
+| Choix du héros | Exploration | Le Gardien |
 |---|---|---|
-| ![Niveau](docs/screenshots/niveau.png) | ![Dash](docs/screenshots/dash.png) | ![Boss](docs/screenshots/boss.png) |
+| ![Héros](docs/screenshots/heros.png) | ![Niveau](docs/screenshots/niveau.png) | ![Boss](docs/screenshots/boss.png) |
 
 ## Lancer le jeu
 
@@ -29,6 +29,16 @@ flutter run -d macos     # ou : -d chrome, un téléphone, etc.
 | Son      | M                     | (menu pause)       |
 | Jouer    | Entrée (menu)         |                    |
 
+## Personnages
+
+| Héros | Vie | Points forts |
+|---|---|---|
+| **Le Chevalier** | 6 | robuste, un peu plus lent |
+| **Le Samouraï** | 5 | katana à grande allonge |
+| **Le Ninja** | 4 | le plus rapide, dash qui recharge vite |
+
+Le héros se choisit au lancement d'une nouvelle partie et suit la sauvegarde.
+
 ## Progression (ability gating)
 
 1. **Double saut** (gemme bleue) : plateformes après le départ
@@ -46,8 +56,9 @@ flutter run -d macos     # ou : -d chrome, un téléphone, etc.
   caméra lissée qui anticipe le regard, poussière, particules et halos lumineux
 - **Décor** : ciel de crépuscule, lune, étoiles scintillantes, 3 couches de parallaxe,
   raccords d'herbe automatiques, ombrage en profondeur, décorations générées
-- **Interface** : écran titre sur le niveau qui défile en démo, pause floutée avec statistiques,
-  écran de victoire (pièces, temps, morts), HUD pixel art, bannières animées,
+- **Interface** : choix du héros avec aperçu animé et statistiques, écran titre sur le niveau
+  qui défile en démo, pause floutée avec statistiques, écran de victoire (pièces, temps, morts),
+  HUD pixel art, barre de vie du boss (points de vie, phase), bannières animées,
   contrôles tactiles uniquement sur mobile
 - **Son** : musiques chiptune en boucle (menu, niveau, boss), 24 bruitages (sauts, dash,
   coups, pièces, checkpoints, boss, interface), son coupable et réglage conservé
@@ -67,7 +78,7 @@ lib/
 │   ├── constants.dart               # tuile 18 px, échelle, résolution 480x270
 │   └── palette.dart                 # couleurs partagées
 ├── domain/                          # règles du jeu, Dart pur
-│   ├── entities/                    # Ability, Tile, Spawn, LevelGrid, GameProgress
+│   ├── entities/                    # Ability, HeroClass, Tile, Spawn, LevelGrid, GameProgress
 │   ├── physics/collision.dart       # moteur de collision AABB sur grille
 │   ├── repositories/                # contrats Level, Progress, Settings
 │   └── usecases/                    # niveau, progression, réglage du son
@@ -87,7 +98,8 @@ lib/
 
 ## Assets
 
-Graphismes, polices et bruitages : [Kenney](https://kenney.nl). Musique :
+Graphismes, polices et bruitages : [Kenney](https://kenney.nl). Personnages : PixiVan et
+DezrasDragons. Musique :
 [Juhani Junkala](https://opengameart.org/content/4-chiptunes-adventure). Tout est en CC0,
 détail dans
 [`assets/CREDITS.md`](assets/CREDITS.md).

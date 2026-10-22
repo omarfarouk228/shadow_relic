@@ -85,7 +85,7 @@ class MenuOverlay extends StatelessWidget {
                             'NOUVELLE PARTIE',
                             primary: !hasSave,
                             audio: game.audio,
-                            onTap: () => game.startGame(continueSave: false),
+                            onTap: game.openHeroSelect,
                           ),
                         ],
                       ),

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
 import '../../core/palette.dart';
+import '../sprites/hero_sprites.dart';
 import '../sprites/render_utils.dart';
 import 'player.dart';
 
@@ -49,10 +50,12 @@ class Poof extends PositionComponent {
 
 /// Arc de coup d'épée, suit le joueur.
 class SlashFx extends PositionComponent {
-  SlashFx({required this.owner, required this.dir}) : super(priority: 6);
+  SlashFx({required this.owner, required this.dir, this.reach = 1})
+      : super(priority: 6);
 
   final Player owner;
   final int dir;
+  final double reach;
   double t = 0;
   static const life = 0.14;
 
@@ -65,13 +68,14 @@ class SlashFx extends PositionComponent {
       return;
     }
     position = owner.position +
-        Vector2(dir > 0 ? owner.width + 6 : -6, owner.height / 2 - 1);
+        Vector2(dir > 0 ? owner.width + 6 * reach : -6 * reach,
+            owner.height / 2 - 1);
   }
 
   @override
   void render(Canvas canvas) {
     final p = t / life;
-    final rect = Rect.fromCircle(center: Offset.zero, radius: 11);
+    final rect = Rect.fromCircle(center: Offset.zero, radius: 11 * reach);
     final start = dir > 0 ? -math.pi / 2.1 : math.pi - math.pi / 1.95;
     const sweep = math.pi * 0.9;
     drawGlow(canvas, Offset(dir * 4.0, 0), 16, Palette.accent,
@@ -194,7 +198,7 @@ class Afterimage extends PositionComponent {
   @override
   void render(Canvas canvas) {
     final a = (1 - t / life) * 0.55;
-    renderSpriteBottom(canvas, sprite, 0, 0,
+    HeroSprites.render(canvas, sprite, 0, 0,
         flip: flip, paint: solidPaint(Palette.accent.withValues(alpha: a)));
   }
 }

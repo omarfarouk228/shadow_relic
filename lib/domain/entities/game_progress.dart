@@ -1,6 +1,7 @@
 import 'package:vector_math/vector_math.dart';
 
 import 'ability.dart';
+import 'hero_class.dart';
 
 /// État persistant d'une partie.
 class GameProgress {
@@ -8,6 +9,7 @@ class GameProgress {
     Set<Ability>? abilities,
     Set<int>? collectedCoins,
     Set<int>? activatedCheckpoints,
+    this.hero = HeroClass.knight,
     this.respawn,
     this.deaths = 0,
     this.playTime = 0,
@@ -16,6 +18,9 @@ class GameProgress {
         activatedCheckpoints = activatedCheckpoints ?? {};
 
   final Set<Ability> abilities;
+
+  /// Personnage choisi pour cette partie.
+  final HeroClass hero;
 
   /// Identifiants ([Spawn.id]) des pièces déjà ramassées.
   final Set<int> collectedCoins;

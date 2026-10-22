@@ -3,6 +3,7 @@ import 'package:shadow_relic/data/datasources/progress_local_source.dart';
 import 'package:shadow_relic/data/repositories/progress_repository_impl.dart';
 import 'package:shadow_relic/domain/entities/ability.dart';
 import 'package:shadow_relic/domain/entities/game_progress.dart';
+import 'package:shadow_relic/domain/entities/hero_class.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vector_math/vector_math.dart';
 
@@ -20,6 +21,7 @@ void main() {
 
   test('aller-retour sauvegarde / chargement', () async {
     await repo.save(GameProgress(
+      hero: HeroClass.ninja,
       abilities: {Ability.doubleJump, Ability.dash},
       collectedCoins: {210010, 210011},
       activatedCheckpoints: {250005},
@@ -28,6 +30,7 @@ void main() {
       playTime: 125.5,
     ));
     final p = (await repo.load())!;
+    expect(p.hero, HeroClass.ninja);
     expect(p.abilities, {Ability.doubleJump, Ability.dash});
     expect(p.collectedCoins, {210010, 210011});
     expect(p.coins, 2);
@@ -54,6 +57,12 @@ void main() {
           '{"abilities":["dash"],"respawn":[160.0,800.0],"coins":4}'
     });
     expect(await repo.load(), isNull);
+  });
+
+  test('sauvegarde v2 sans héros -> chevalier par défaut', () async {
+    SharedPreferences.setMockInitialValues(
+        {'shadow_relic_save': '{"version":2,"abilities":["dash"]}'});
+    expect((await repo.load())!.hero, HeroClass.knight);
   });
 
   test('clear efface la sauvegarde', () async {

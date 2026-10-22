@@ -9,6 +9,7 @@ import '../../core/constants.dart';
 import '../../core/palette.dart';
 import '../../domain/entities/ability.dart';
 import '../../domain/entities/game_progress.dart';
+import '../../domain/entities/hero_class.dart';
 import '../../domain/entities/level_grid.dart';
 import '../../domain/entities/spawn.dart';
 import '../../domain/usecases/load_level.dart';
@@ -25,6 +26,7 @@ import '../components/tile_renderer.dart';
 import '../hud/hud.dart';
 import '../overlays/overlay_ids.dart';
 import '../sprites/game_sprites.dart';
+import '../sprites/hero_sprites.dart';
 import 'camera_rig.dart';
 import 'input_state.dart';
 import 'keyboard_controls.dart';
@@ -57,6 +59,7 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
 
   final input = InputState();
   late GameSprites sprites;
+  late Map<HeroClass, HeroSprites> heroSprites;
   late LevelGrid grid;
   late Player player;
   late Hud hud;
@@ -73,6 +76,9 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
   /// Une sauvegarde existe : le menu propose « Continuer ».
   final saveAvailable = ValueNotifier<bool>(false);
 
+  /// Personnage surligné sur l'écran de sélection.
+  final selectedHero = ValueNotifier<HeroClass>(HeroClass.knight);
+
   double _hitStop = 0;
 
   Set<Ability> get abilities => progress.abilities;
@@ -87,6 +93,7 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
   @override
   Future<void> onLoad() async {
     sprites = await GameSprites.load(images);
+    heroSprites = await HeroSprites.loadAll(images);
     camera.backdrop = Backdrop();
     hud = Hud();
     camera.viewport.addAll([Vignette(), hud]);
@@ -156,7 +163,8 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
       }
     }
 
-    player = Player(position: respawnPoint.clone())..priority = 4;
+    player = Player(position: respawnPoint.clone(), hero: progress.hero)
+      ..priority = 4;
     world.add(player);
 
     rig = CameraRig(
@@ -193,19 +201,45 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
 
   // ---------- cycle de vie ----------
 
-  Future<void> startGame({required bool continueSave}) async {
+  /// Menu -> écran de choix du personnage.
+  void openHeroSelect() {
+    audio.play(Sfx.uiOpen);
+    overlays.remove(Overlays.menu);
+    overlays.add(Overlays.heroSelect);
+  }
+
+  void closeHeroSelect() {
+    audio.play(Sfx.uiClose);
+    overlays.remove(Overlays.heroSelect);
+    overlays.add(Overlays.menu);
+  }
+
+  void cycleHero(int delta) {
+    const all = HeroClass.values;
+    final i = (selectedHero.value.index + delta) % all.length;
+    selectedHero.value = all[i < 0 ? i + all.length : i];
+    audio.play(Sfx.uiHover);
+  }
+
+  /// [hero] : personnage d'une nouvelle partie (ignoré si on continue).
+  Future<void> startGame({
+    required bool continueSave,
+    HeroClass? hero,
+  }) async {
     if (continueSave) {
       progress = await loadProgress();
     } else {
       await clearProgress();
-      progress = GameProgress();
+      progress = GameProgress(hero: hero ?? selectedHero.value);
     }
+    selectedHero.value = progress.hero;
     playing = true;
     hud.clearBanner();
     _buildWorld();
     audio.play(Sfx.uiConfirm);
     audio.playMusic(Music.level);
     overlays.remove(Overlays.menu);
+    overlays.remove(Overlays.heroSelect);
     overlays.remove(Overlays.victory);
     resumeEngine();
   }
@@ -240,11 +274,12 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
     saveAvailable.value = await hasSavedProgress();
   }
 
-  /// Efface la sauvegarde et relance une partie neuve.
+  /// Efface la sauvegarde et relance une partie neuve, même personnage.
   Future<void> replay() async {
+    final hero = progress.hero;
     await clearProgress();
     saveAvailable.value = false;
-    await startGame(continueSave: false);
+    await startGame(continueSave: false, hero: hero);
   }
 
   void togglePause() {
@@ -318,17 +353,34 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
       toggleMute();
     }
     if (!playing) {
-      // menu : Entrée lance l'option principale
-      if (event is KeyDownEvent &&
-          overlays.isActive(Overlays.menu) &&
-          (event.logicalKey == LogicalKeyboardKey.enter ||
-              event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
-        startGame(continueSave: saveAvailable.value);
-      }
+      if (event is KeyDownEvent) _menuKey(event.logicalKey);
       input.clearQueued();
       return KeyEventResult.handled;
     }
     if (pause) togglePause();
     return KeyEventResult.handled;
+  }
+
+  /// Navigation clavier dans le menu et l'écran de sélection.
+  void _menuKey(LogicalKeyboardKey k) {
+    final confirm = k == LogicalKeyboardKey.enter ||
+        k == LogicalKeyboardKey.numpadEnter ||
+        k == LogicalKeyboardKey.space;
+    if (overlays.isActive(Overlays.heroSelect)) {
+      if (k == LogicalKeyboardKey.arrowLeft ||
+          k == LogicalKeyboardKey.keyA ||
+          k == LogicalKeyboardKey.keyQ) {
+        cycleHero(-1);
+      } else if (k == LogicalKeyboardKey.arrowRight ||
+          k == LogicalKeyboardKey.keyD) {
+        cycleHero(1);
+      } else if (confirm) {
+        startGame(continueSave: false);
+      } else if (k == LogicalKeyboardKey.escape) {
+        closeHeroSelect();
+      }
+    } else if (overlays.isActive(Overlays.menu) && confirm) {
+      saveAvailable.value ? startGame(continueSave: true) : openHeroSelect();
+    }
   }
 }

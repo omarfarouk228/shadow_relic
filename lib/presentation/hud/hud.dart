@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/palette.dart';
 import '../../domain/entities/ability.dart';
+import '../components/boss.dart';
 import '../game/shadow_relic_game.dart';
 import '../overlays/overlay_ids.dart';
 import '../sprites/game_sprites.dart';
@@ -56,6 +57,10 @@ class Hud extends PositionComponent with HasGameReference<ShadowRelicGame> {
   static final _bossNameShadow =
       _text(8, Palette.outline, font: HudFonts.title);
   static final _bannerSubText = _text(8, Palette.textSoft);
+  static final _bossNameEnraged =
+      _text(8, const Color(0xFFFF6B7A), font: HudFonts.title);
+  static final _hpText = _text(9, Palette.white);
+  static final _hpShadow = _text(9, Palette.outline);
 
   @override
   Future<void> onLoad() async {
@@ -147,34 +152,53 @@ class Hud extends PositionComponent with HasGameReference<ShadowRelicGame> {
       );
     }
 
-    // ---- barre de vie du boss ----
+    // ---- barre de vie du boss (en haut, au centre) ----
     if (_bossShown > 0) {
       canvas.saveLayer(
           null, Paint()..color = Colors.white.withValues(alpha: _bossShown));
       final boss = game.boss;
-      const w = 200.0;
+      final enraged = boss?.enraged ?? false;
+      const w = 220.0;
       const x = (kViewWidth - w) / 2;
-      final y = kViewHeight - 18 + (1 - _bossShown) * 10;
-      _bossNameShadow.render(canvas, 'LE GARDIEN', Vector2(x + 1, y - 10));
-      _bossName.render(canvas, 'LE GARDIEN', Vector2(x, y - 11));
+      final y = 18 - (1 - _bossShown) * 8;
+      final hp = math.max(0, boss?.hp ?? 0);
+
+      // nom à gauche, points de vie à droite
+      final name = enraged ? 'LE GARDIEN  ·  ENRAGÉ' : 'LE GARDIEN';
+      _bossNameShadow.render(canvas, name, Vector2(x + 1, y - 10));
+      (enraged ? _bossNameEnraged : _bossName)
+          .render(canvas, name, Vector2(x, y - 11));
+      final hpLabel = '$hp / ${Boss.maxHp}';
+      _hpShadow.render(canvas, hpLabel, Vector2(x + w + 1, y - 10),
+          anchor: Anchor.topRight);
+      _hpText.render(canvas, hpLabel, Vector2(x + w, y - 11),
+          anchor: Anchor.topRight);
+
       final frame = RRect.fromRectAndRadius(
-          Rect.fromLTWH(x - 2, y - 2, w + 4, 10), const Radius.circular(3));
+          Rect.fromLTWH(x - 2, y - 2, w + 4, 12), const Radius.circular(3));
+      if (enraged) {
+        drawGlow(canvas, frame.center, w * 0.6, Palette.danger,
+            intensity: 0.12 + 0.06 * math.sin(_t * 8));
+      }
       canvas.drawRRect(frame, Paint()..color = Palette.outline);
       canvas.drawRect(
-          Rect.fromLTWH(x, y, w, 6), Paint()..color = Palette.dangerDark);
-      canvas.drawRect(Rect.fromLTWH(x, y, w * _bossTrail, 6),
+          Rect.fromLTWH(x, y, w, 8), Paint()..color = Palette.dangerDark);
+      canvas.drawRect(Rect.fromLTWH(x, y, w * _bossTrail, 8),
           Paint()..color = const Color(0xFFFFE9D6));
       final ratio = boss?.hpRatio ?? 0;
       canvas.drawRect(
-        Rect.fromLTWH(x, y, w * ratio, 6),
+        Rect.fromLTWH(x, y, w * ratio, 8),
         Paint()
           ..shader = LinearGradient(colors: [
             Palette.danger,
-            (boss?.enraged ?? false) ? const Color(0xFFFF3D6E) : Palette.boss,
-          ]).createShader(Rect.fromLTWH(x, y, w, 6)),
+            enraged ? const Color(0xFFFF3D6E) : Palette.boss,
+          ]).createShader(const Rect.fromLTWH(x, 0, w, 8)),
       );
       canvas.drawRect(Rect.fromLTWH(x, y, w * ratio, 2),
           Paint()..color = const Color(0x55FFFFFF));
+      // repère de la phase 2 (moitié de la vie)
+      canvas.drawRect(Rect.fromLTWH(x + w / 2 - 0.5, y, 1, 8),
+          Paint()..color = const Color(0x990A0815));
       canvas.restore();
     }
 
@@ -191,7 +215,7 @@ class Hud extends PositionComponent with HasGameReference<ShadowRelicGame> {
       final w = math.max(tw, sw) + 28;
       final h = _bannerSub.isEmpty ? 22.0 : 34.0;
       const cx = kViewWidth / 2;
-      final y = 30.0 - (1 - appear) * 14;
+      final y = (_bossShown > 0 ? 38.0 : 30.0) - (1 - appear) * 14;
 
       canvas.saveLayer(
           null, Paint()..color = Colors.white.withValues(alpha: fade));

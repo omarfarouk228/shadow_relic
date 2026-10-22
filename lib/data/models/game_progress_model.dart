@@ -2,6 +2,7 @@ import 'package:vector_math/vector_math.dart';
 
 import '../../domain/entities/ability.dart';
 import '../../domain/entities/game_progress.dart';
+import '../../domain/entities/hero_class.dart';
 
 /// Sérialisation JSON de [GameProgress].
 abstract final class GameProgressModel {
@@ -9,6 +10,7 @@ abstract final class GameProgressModel {
 
   static Map<String, dynamic> toJson(GameProgress p) => {
         'version': version,
+        'hero': p.hero.name,
         'abilities': p.abilities.map((a) => a.name).toList(),
         'coins': p.collectedCoins.toList(),
         'checkpoints': p.activatedCheckpoints.toList(),
@@ -26,7 +28,9 @@ abstract final class GameProgressModel {
     Set<int> ints(String key) =>
         {for (final v in (json[key] as List? ?? const [])) (v as num).toInt()};
     final r = json['respawn'] as List?;
+    final hero = json['hero'] as String?;
     return GameProgress(
+      hero: hero == null ? HeroClass.knight : HeroClass.values.byName(hero),
       abilities: {
         for (final n in (json['abilities'] as List? ?? const []))
           Ability.values.byName(n as String),

@@ -1,10 +1,12 @@
 import 'package:flame/components.dart';
 import 'package:flame_test/flame_test.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadow_relic/core/constants.dart';
 import 'package:shadow_relic/domain/entities/ability.dart';
 import 'package:shadow_relic/domain/entities/game_progress.dart';
+import 'package:shadow_relic/domain/entities/hero_class.dart';
 import 'package:shadow_relic/domain/entities/spawn.dart';
 import 'package:shadow_relic/domain/entities/tile.dart';
 import 'package:shadow_relic/domain/repositories/progress_repository.dart';
@@ -53,7 +55,12 @@ Future<ShadowRelicGame> loaded(InMemoryProgressRepository repo) async {
         audio: SilentGameAudio(),
       ));
   // sans GameWidget, les overlays doivent être déclarés à la main
-  for (final id in [Overlays.menu, Overlays.pause, Overlays.victory]) {
+  for (final id in [
+    Overlays.menu,
+    Overlays.heroSelect,
+    Overlays.pause,
+    Overlays.victory,
+  ]) {
     game.overlays.addEntry(id, (_, __) => const SizedBox());
   }
   return game;
@@ -219,6 +226,63 @@ void main() {
     expect(game.overlays.isActive(Overlays.victory), isFalse);
     expect(game.playing, isTrue);
     expect(game.coins, 0);
+  });
+
+  test('menu : Entrée ouvre le choix du héros, flèches puis Entrée lancent',
+      () async {
+    final game = await loaded(repo);
+    game.overlays.add(Overlays.menu);
+    void press(LogicalKeyboardKey k) => game.onKeyEvent(
+        KeyDownEvent(
+            physicalKey: PhysicalKeyboardKey.enter,
+            logicalKey: k,
+            timeStamp: Duration.zero),
+        {k});
+
+    press(LogicalKeyboardKey.enter);
+    expect(game.overlays.isActive(Overlays.heroSelect), isTrue);
+    press(LogicalKeyboardKey.arrowRight);
+    press(LogicalKeyboardKey.arrowRight);
+    expect(game.selectedHero.value, HeroClass.ninja);
+    press(LogicalKeyboardKey.arrowRight);
+    expect(game.selectedHero.value, HeroClass.knight, reason: 'boucle');
+    press(LogicalKeyboardKey.arrowLeft);
+    expect(game.selectedHero.value, HeroClass.ninja);
+    press(LogicalKeyboardKey.enter);
+    await Future<void>.delayed(Duration.zero);
+    await game.ready();
+    expect(game.playing, isTrue);
+    expect(game.player.hero, HeroClass.ninja);
+    expect(repo.stored, isNull,
+        reason: 'rien à sauver tant qu\'on n\'a rien fait');
+  });
+
+  test('chaque héros applique ses caractéristiques et est sauvegardé',
+      () async {
+    final game = await loaded(repo);
+    await game.startGame(continueSave: false, hero: HeroClass.ninja);
+    await game.ready();
+    expect(game.player.maxHp, HeroClass.ninja.maxHp);
+    expect(game.player.hp, 4);
+    await step(game, 0.5);
+    final x0 = game.player.x;
+    game.input.kbRight = true;
+    await step(game, 0.5);
+    final ninjaRun = game.player.x - x0;
+
+    final knight = await started(repo);
+    expect(knight.player.maxHp, 6);
+    await step(knight, 0.5);
+    final k0 = knight.player.x;
+    knight.input.kbRight = true;
+    await step(knight, 0.5);
+    expect(ninjaRun, greaterThan(knight.player.x - k0));
+
+    // le héros suit la sauvegarde
+    repo.stored = GameProgress(hero: HeroClass.samurai);
+    final resumed = await started(repo, continueSave: true);
+    expect(resumed.player.hero, HeroClass.samurai);
+    expect(resumed.selectedHero.value, HeroClass.samurai);
   });
 
   test('la touche M coupe et rétablit le son', () async {

@@ -57,7 +57,6 @@ class GameSprites {
   late final flagPole = tile(131);
 
   // ---------- personnages ----------
-  late final playerFrames = [character(0), character(1)];
   late final crawlerFrames = [character(18), character(19)];
   late final bossCalm = character(11);
   late final bossAngry = character(12);

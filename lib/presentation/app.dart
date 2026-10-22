@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import 'game/shadow_relic_game.dart';
+import 'overlays/hero_select_overlay.dart';
 import 'overlays/menu_overlay.dart';
 import 'overlays/overlay_ids.dart';
 import 'overlays/pause_overlay.dart';
@@ -26,6 +27,8 @@ class ShadowRelicApp extends StatelessWidget {
           initialActiveOverlays: const [Overlays.menu],
           overlayBuilderMap: {
             Overlays.menu: (context, game) => MenuOverlay(game: game),
+            Overlays.heroSelect: (context, game) =>
+                HeroSelectOverlay(game: game),
             Overlays.pause: (context, game) => PauseOverlay(game: game),
             Overlays.victory: (context, game) => VictoryOverlay(game: game),
           },

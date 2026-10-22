@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/palette.dart';
 import '../../domain/entities/ability.dart';
+import '../audio/game_audio.dart';
 import '../game/shadow_relic_game.dart';
 import '../sprites/game_sprites.dart';
 import '../sprites/render_utils.dart';
@@ -76,6 +77,7 @@ class HeartPickup extends _Pickup {
   void onCollect() {
     if (game.player.hp >= game.player.maxHp) return; // reste au sol si plein
     game.player.hp++;
+    game.audio.play(Sfx.heart);
     game.world.add(ParticleBurst(
       position: position + size / 2,
       color: Palette.heart,

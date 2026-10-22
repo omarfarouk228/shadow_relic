@@ -8,7 +8,9 @@ import 'package:shadow_relic/domain/entities/game_progress.dart';
 import 'package:shadow_relic/domain/entities/spawn.dart';
 import 'package:shadow_relic/domain/entities/tile.dart';
 import 'package:shadow_relic/domain/repositories/progress_repository.dart';
+import 'package:shadow_relic/domain/repositories/settings_repository.dart';
 import 'package:shadow_relic/injection.dart';
+import 'package:shadow_relic/presentation/audio/game_audio.dart';
 import 'package:shadow_relic/presentation/components/pickups.dart';
 import 'package:shadow_relic/presentation/game/shadow_relic_game.dart';
 import 'package:shadow_relic/presentation/overlays/overlay_ids.dart';
@@ -26,6 +28,16 @@ class InMemoryProgressRepository implements ProgressRepository {
   Future<void> clear() async => stored = null;
 }
 
+class InMemorySettingsRepository implements SettingsRepository {
+  bool muted = false;
+
+  @override
+  Future<bool> isSoundMuted() async => muted;
+
+  @override
+  Future<void> setSoundMuted(bool value) async => muted = value;
+}
+
 /// Fait tourner la boucle de jeu comme le ferait le moteur à 60 fps.
 Future<void> step(ShadowRelicGame game, double seconds) async {
   for (var t = 0.0; t < seconds; t += 1 / 60) {
@@ -35,8 +47,11 @@ Future<void> step(ShadowRelicGame game, double seconds) async {
 }
 
 Future<ShadowRelicGame> loaded(InMemoryProgressRepository repo) async {
-  final game =
-      await initializeGame(() => createGame(progressRepository: repo));
+  final game = await initializeGame(() => createGame(
+        progressRepository: repo,
+        settingsRepository: InMemorySettingsRepository(),
+        audio: SilentGameAudio(),
+      ));
   // sans GameWidget, les overlays doivent être déclarés à la main
   for (final id in [Overlays.menu, Overlays.pause, Overlays.victory]) {
     game.overlays.addEntry(id, (_, __) => const SizedBox());
@@ -204,6 +219,15 @@ void main() {
     expect(game.overlays.isActive(Overlays.victory), isFalse);
     expect(game.playing, isTrue);
     expect(game.coins, 0);
+  });
+
+  test('la touche M coupe et rétablit le son', () async {
+    final game = await started(repo);
+    expect(game.audio.muted.value, isFalse);
+    game.toggleMute();
+    expect(game.audio.muted.value, isTrue);
+    game.toggleMute();
+    expect(game.audio.muted.value, isFalse);
   });
 
   test('pause puis retour au menu : partie sauvegardée', () async {

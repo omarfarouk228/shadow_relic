@@ -76,6 +76,7 @@ class MenuOverlay extends StatelessWidget {
                           PixelButton(
                             'CONTINUER',
                             primary: hasSave,
+                            audio: game.audio,
                             onTap: hasSave
                                 ? () => game.startGame(continueSave: true)
                                 : null,
@@ -83,6 +84,7 @@ class MenuOverlay extends StatelessWidget {
                           PixelButton(
                             'NOUVELLE PARTIE',
                             primary: !hasSave,
+                            audio: game.audio,
                             onTap: () => game.startGame(continueSave: false),
                           ),
                         ],
@@ -100,11 +102,14 @@ class MenuOverlay extends StatelessWidget {
                         KeyHint('MAJ', 'Dash'),
                         KeyHint('X', 'Attaquer'),
                         KeyHint('ÉCHAP', 'Pause'),
+                        KeyHint('M', 'Son'),
                         KeyHint('ENTRÉE', 'Jouer'),
                       ],
                     ),
                   const SizedBox(height: 10),
-                  Text('Graphismes et polices : Kenney.nl (CC0)',
+                  Text(
+                      'Graphismes, polices et bruitages : Kenney.nl (CC0)  ·  '
+                      'Musique : Juhani Junkala (CC0)',
                       style: bodyStyle(10, color: Palette.textMuted)),
                 ],
               );

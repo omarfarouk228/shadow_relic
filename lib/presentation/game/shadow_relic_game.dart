@@ -13,6 +13,8 @@ import '../../domain/entities/level_grid.dart';
 import '../../domain/entities/spawn.dart';
 import '../../domain/usecases/load_level.dart';
 import '../../domain/usecases/progress_usecases.dart';
+import '../../domain/usecases/settings_usecases.dart';
+import '../audio/game_audio.dart';
 import '../components/backdrop.dart';
 import '../components/boss.dart';
 import '../components/enemy.dart';
@@ -34,6 +36,9 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
     required this.hasSavedProgress,
     required this.saveProgress,
     required this.clearProgress,
+    required this.isSoundMuted,
+    required this.setSoundMuted,
+    required this.audio,
   }) : super(
           camera: CameraComponent.withFixedResolution(
             width: kViewWidth,
@@ -46,6 +51,9 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
   final HasSavedProgress hasSavedProgress;
   final SaveProgress saveProgress;
   final ClearProgress clearProgress;
+  final IsSoundMuted isSoundMuted;
+  final SetSoundMuted setSoundMuted;
+  final GameAudio audio;
 
   final input = InputState();
   late GameSprites sprites;
@@ -84,6 +92,16 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
     camera.viewport.addAll([Vignette(), hud]);
     _buildWorld();
     saveAvailable.value = await hasSavedProgress();
+    await audio.load();
+    audio.setMuted(await isSoundMuted());
+    audio.playMusic(Music.menu);
+  }
+
+  void toggleMute() {
+    final muted = !audio.muted.value;
+    audio.setMuted(muted);
+    setSoundMuted(muted);
+    if (!muted) audio.play(Sfx.uiConfirm);
   }
 
   /// Point d'apparition centré dans la cellule, posé au sol.
@@ -185,6 +203,8 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
     playing = true;
     hud.clearBanner();
     _buildWorld();
+    audio.play(Sfx.uiConfirm);
+    audio.playMusic(Music.level);
     overlays.remove(Overlays.menu);
     overlays.remove(Overlays.victory);
     resumeEngine();
@@ -193,6 +213,11 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
   void onVictory() {
     playing = false;
     hud.clearBanner();
+    audio.stopMusic();
+    audio.play(Sfx.bossDie);
+    Future.delayed(const Duration(milliseconds: 700), () {
+      audio.play(Sfx.victory);
+    });
     saveProgress(progress);
     Future.delayed(const Duration(milliseconds: 1400), () {
       pauseEngine();
@@ -211,6 +236,7 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
     _buildWorld();
     overlays.add(Overlays.menu);
     resumeEngine();
+    audio.playMusic(Music.menu);
     saveAvailable.value = await hasSavedProgress();
   }
 
@@ -226,9 +252,13 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
     if (paused) {
       overlays.remove(Overlays.pause);
       resumeEngine();
+      audio.play(Sfx.uiClose);
+      audio.resumeMusic();
     } else {
       overlays.add(Overlays.pause);
       pauseEngine();
+      audio.play(Sfx.uiOpen);
+      audio.pauseMusic();
       saveProgress(progress);
     }
   }
@@ -237,6 +267,7 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
 
   void collectCoin(int id) {
     progress.collectedCoins.add(id);
+    audio.play(Sfx.coin);
     saveProgress(progress);
   }
 
@@ -248,22 +279,26 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
       Ability.wallJump => 'SAUT MURAL\nGlisse contre un mur puis saute',
     };
     hud.showBanner(label, color: GameSprites.abilityColor(a));
+    audio.play(Sfx.ability);
     saveProgress(progress);
   }
 
   void activateCheckpoint(int id, Vector2 cellTopLeft) {
     progress.activatedCheckpoints.add(id);
+    audio.play(Sfx.checkpoint);
     progress.respawn = standOn(cellTopLeft);
     saveProgress(progress);
   }
 
   void onPlayerDeath() {
     progress.deaths++;
+    audio.play(Sfx.death);
     saveProgress(progress);
   }
 
   void gateBroken(Vector2 worldPos) {
     shake(2.5, 0.2);
+    audio.play(Sfx.crate);
     world.add(ParticleBurst(
       position: worldPos,
       color: Palette.gate,
@@ -279,6 +314,9 @@ class ShadowRelicGame extends FlameGame with KeyboardEvents {
     Set<LogicalKeyboardKey> keysPressed,
   ) {
     final pause = applyKeyboard(input, event, keysPressed);
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyM) {
+      toggleMute();
+    }
     if (!playing) {
       // menu : Entrée lance l'option principale
       if (event is KeyDownEvent &&

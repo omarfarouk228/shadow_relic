@@ -53,8 +53,10 @@ class VictoryOverlay extends StatelessWidget {
               delay: 0.45,
               child: Column(
                 children: [
-                  PixelButton('REJOUER', primary: true, onTap: game.replay),
-                  PixelButton('MENU PRINCIPAL', onTap: game.backToMenu),
+                  PixelButton('REJOUER',
+                      primary: true, audio: game.audio, onTap: game.replay),
+                  PixelButton('MENU PRINCIPAL',
+                      audio: game.audio, onTap: game.backToMenu),
                 ],
               ),
             ),

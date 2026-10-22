@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/palette.dart';
 import '../../domain/physics/collision.dart';
+import '../audio/game_audio.dart';
 import '../game/shadow_relic_game.dart';
 import '../sprites/render_utils.dart';
 import 'fx.dart';
@@ -53,6 +54,7 @@ class Enemy extends PositionComponent with HasGameReference<ShadowRelicGame> {
     hp -= dmg;
     _flash = 0.12;
     _knock = 0.25;
+    game.audio.play(hp <= 0 ? Sfx.enemyDie : Sfx.hit);
     vel.x = fromDir * 190 * kScale;
     vel.y = -160 * kScale;
     game.world.add(ParticleBurst(

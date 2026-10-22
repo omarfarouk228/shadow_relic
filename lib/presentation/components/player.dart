@@ -8,6 +8,7 @@ import '../../core/palette.dart';
 import '../../domain/entities/ability.dart';
 import '../../domain/entities/tile.dart';
 import '../../domain/physics/collision.dart';
+import '../audio/game_audio.dart';
 import '../game/shadow_relic_game.dart';
 import '../sprites/render_utils.dart';
 import 'fx.dart';
@@ -89,6 +90,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     if (_jumpBuffer > 0) {
       if (onGround || _coyote > 0) {
         _doJump();
+        game.audio.play(Sfx.jump);
       } else if (_wallSliding && game.abilities.contains(Ability.wallJump)) {
         // wall jump : on repousse du mur
         vel.y = wallJumpVy;
@@ -97,6 +99,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
         _wallLock = wallJumpLock;
         _jumpBuffer = 0;
         _stretch = 0.3;
+        game.audio.play(Sfx.wallJump);
         game.world.add(
             Poof(position: position + Vector2(_wallDir > 0 ? width : 0, 8))
               ..priority = 5);
@@ -104,6 +107,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
           game.abilities.contains(Ability.doubleJump)) {
         _airJumpsLeft--;
         _doJump();
+        game.audio.play(Sfx.doubleJump);
         game.world.add(Poof(position: position + Vector2(width / 2, height))
           ..priority = 5);
       }
@@ -120,6 +124,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
       _dashCd = dashCooldown;
       _stretch = -0.25;
       game.shake(1.5, 0.12);
+      game.audio.play(Sfx.dash);
       game.world.add(
           Poof(position: position + Vector2(width / 2, height))..priority = 5);
     }
@@ -169,6 +174,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
       _attackTimer = 0.22;
       _hitThisSwing.clear();
       game.world.add(SlashFx(owner: this, dir: facing));
+      game.audio.play(Sfx.swing);
     }
     if (_attackTimer > 0.06) _applySlashDamage();
 
@@ -192,6 +198,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     if (hit.down) {
       if (!onGround && fallSpeed > 120 * kScale) {
         _stretch = -0.35 * (fallSpeed / maxFall).clamp(0.4, 1.0);
+        game.audio.play(Sfx.land);
         game.world.add(
             Poof(position: position + Vector2(width / 2, height), small: true)
               ..priority = 5);
@@ -297,6 +304,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     _wallLock = 0.2;
     game.hitStop(0.08);
     game.shake(3, 0.25);
+    game.audio.play(Sfx.hurt);
     game.world.add(ParticleBurst(
       position: position + size / 2,
       color: Palette.heart,
@@ -310,6 +318,7 @@ class Player extends PositionComponent with HasGameReference<ShadowRelicGame> {
     hp--;
     _invuln = 1.1;
     game.shake(3, 0.2);
+    game.audio.play(Sfx.hurt);
     if (hp <= 0) {
       _die();
     } else {

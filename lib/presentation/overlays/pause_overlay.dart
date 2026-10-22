@@ -40,7 +40,16 @@ class PauseOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               PixelButton('REPRENDRE', primary: true, onTap: game.togglePause),
-              PixelButton('MENU PRINCIPAL', onTap: game.backToMenu),
+              ValueListenableBuilder<bool>(
+                valueListenable: game.audio.muted,
+                builder: (context, muted, _) => PixelButton(
+                  muted ? 'SON : COUPÉ' : 'SON : ACTIVÉ',
+                  audio: game.audio,
+                  onTap: game.toggleMute,
+                ),
+              ),
+              PixelButton('MENU PRINCIPAL',
+                  audio: game.audio, onTap: game.backToMenu),
             ],
           ),
         ),

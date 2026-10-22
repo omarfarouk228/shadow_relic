@@ -1,6 +1,7 @@
 # Shadow Relic 🗡️
 
-Metroidvania complet en **Flutter + Flame**, en pixel art (sprites et polices Kenney, licence CC0).
+Metroidvania complet en **Flutter + Flame**, en pixel art, avec bruitages et musique chiptune
+(assets Kenney et Juhani Junkala, licence CC0).
 Compile et tourne tel quel sur mobile, desktop et web.
 
 ![Écran titre](docs/screenshots/menu.png)
@@ -25,6 +26,7 @@ flutter run -d macos     # ou : -d chrome, un téléphone, etc.
 | Dash     | Maj / C               | bouton dash        |
 | Attaquer | X / J                 | bouton attaque     |
 | Pause    | Échap / P             |                    |
+| Son      | M                     | (menu pause)       |
 | Jouer    | Entrée (menu)         |                    |
 
 ## Progression (ability gating)
@@ -47,6 +49,8 @@ flutter run -d macos     # ou : -d chrome, un téléphone, etc.
 - **Interface** : écran titre sur le niveau qui défile en démo, pause floutée avec statistiques,
   écran de victoire (pièces, temps, morts), HUD pixel art, bannières animées,
   contrôles tactiles uniquement sur mobile
+- **Son** : musiques chiptune en boucle (menu, niveau, boss), 24 bruitages (sauts, dash,
+  coups, pièces, checkpoints, boss, interface), son coupable et réglage conservé
 - **Sauvegarde** : capacités, pièces ramassées, checkpoints allumés, morts et temps de jeu
   (`shared_preferences`)
 
@@ -65,8 +69,8 @@ lib/
 ├── domain/                          # règles du jeu, Dart pur
 │   ├── entities/                    # Ability, Tile, Spawn, LevelGrid, GameProgress
 │   ├── physics/collision.dart       # moteur de collision AABB sur grille
-│   ├── repositories/                # contrats LevelRepository, ProgressRepository
-│   └── usecases/                    # LoadLevel, Load/HasSaved/Save/ClearProgress
+│   ├── repositories/                # contrats Level, Progress, Settings
+│   └── usecases/                    # niveau, progression, réglage du son
 ├── data/                            # implémentations concrètes
 │   ├── datasources/                 # carte ASCII (124x30), parseur, shared_preferences
 │   ├── models/game_progress_model.dart  # sérialisation JSON versionnée
@@ -74,6 +78,7 @@ lib/
 └── presentation/                    # Flutter + Flame
     ├── app.dart                     # MaterialApp + GameWidget
     ├── game/                        # ShadowRelicGame, caméra, entrées clavier / tactile
+    ├── audio/                       # GameAudio (flame_audio) + version silencieuse
     ├── sprites/                     # découpe des planches Kenney, helpers de rendu
     ├── components/                  # joueur, ennemis, boss, objets, fx, tuiles, décor
     ├── hud/                         # HUD + contrôles tactiles
@@ -82,7 +87,9 @@ lib/
 
 ## Assets
 
-Graphismes et polices : [Kenney](https://kenney.nl) (CC0), détail dans
+Graphismes, polices et bruitages : [Kenney](https://kenney.nl). Musique :
+[Juhani Junkala](https://opengameart.org/content/4-chiptunes-adventure). Tout est en CC0,
+détail dans
 [`assets/CREDITS.md`](assets/CREDITS.md).
 
 ## Tests

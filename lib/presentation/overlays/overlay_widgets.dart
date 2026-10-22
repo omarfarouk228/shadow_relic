@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../core/palette.dart';
+import '../audio/game_audio.dart';
 import '../hud/hud.dart';
 
 /// Formate un temps de jeu en « mm:ss » (ou « h:mm:ss »).
@@ -117,12 +118,16 @@ class PixelButton extends StatefulWidget {
     required this.onTap,
     this.primary = false,
     this.width = 260,
+    this.audio,
   });
 
   final String label;
   final VoidCallback? onTap;
   final bool primary;
   final double width;
+
+  /// Sons de survol et de clic (optionnels).
+  final GameAudio? audio;
 
   @override
   State<PixelButton> createState() => _PixelButtonState();
@@ -151,7 +156,10 @@ class _PixelButtonState extends State<PixelButton> {
 
     return MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      onEnter: (_) => setState(() => _hover = true),
+      onEnter: (_) {
+        setState(() => _hover = true);
+        if (enabled) widget.audio?.play(Sfx.uiHover);
+      },
       onExit: (_) => setState(() {
         _hover = false;
         _down = false;
@@ -162,6 +170,7 @@ class _PixelButtonState extends State<PixelButton> {
         onTapUp: enabled
             ? (_) {
                 setState(() => _down = false);
+                widget.audio?.play(Sfx.uiConfirm);
                 widget.onTap!();
               }
             : null,

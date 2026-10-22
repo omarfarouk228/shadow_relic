@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/palette.dart';
 import '../../domain/physics/collision.dart';
+import '../audio/game_audio.dart';
 import '../game/shadow_relic_game.dart';
 import '../sprites/render_utils.dart';
 import 'fx.dart';
@@ -55,6 +56,8 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
           (player.position.x - position.x).abs() < 9 * kTile) {
         active = true;
         game.shake(3, 0.4);
+        game.audio.play(Sfx.bossAppear);
+        game.audio.playMusic(Music.boss);
         game.hud.showBanner(
             'LE GARDIEN DE LA RELIQUE\nDétruis-le pour récupérer la relique');
       }
@@ -88,6 +91,7 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
       _squash = -0.4;
       _spawnShockwaves();
       game.shake(enraged ? 5 : 4, 0.3);
+      game.audio.play(Sfx.bossLand);
       game.world.add(
           Poof(position: position + Vector2(width / 2, height))..priority = 5);
     }
@@ -112,6 +116,7 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
     hp -= dmg;
     _flash = 0.1;
     _iframes = 0.25;
+    game.audio.play(Sfx.bossHit);
     game.world.add(ParticleBurst(
       position: position + size / 2,
       color: Palette.boss,
@@ -141,6 +146,7 @@ class Boss extends PositionComponent with HasGameReference<ShadowRelicGame> {
 
   void resetFight() {
     if (dead) return;
+    if (active) game.audio.playMusic(Music.level);
     hp = maxHp;
     active = false;
     _inAir = false;
